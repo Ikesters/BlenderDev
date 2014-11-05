@@ -167,6 +167,15 @@ class GRAPH_MT_marker(Menu):
 
         # TODO: pose markers for action edit mode only?
 
+class GRAPH_MT_reduction(Menu):
+    bl_label = "Reduction"
+
+    def draw(self, context):
+        layout = self.layout
+
+        from bl_ui.space_time import reduction_menu_generic
+        reduction_menu_generic(layout)
+
 
 class GRAPH_MT_channel(Menu):
     bl_label = "Channel"
