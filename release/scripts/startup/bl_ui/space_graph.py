@@ -72,6 +72,7 @@ class GRAPH_MT_editor_menus(Menu):
         layout.menu("GRAPH_MT_view")
         layout.menu("GRAPH_MT_select")
         layout.menu("GRAPH_MT_marker")
+        layout.menu("GRAPH_MT_reduction")
         layout.menu("GRAPH_MT_channel")
         layout.menu("GRAPH_MT_key")
 

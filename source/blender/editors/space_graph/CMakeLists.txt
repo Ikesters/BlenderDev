@@ -36,6 +36,7 @@ set(INC_SYS
 )
 
 set(SRC
+	anim_reduction.c
 	graph_buttons.c
 	graph_draw.c
 	graph_edit.c

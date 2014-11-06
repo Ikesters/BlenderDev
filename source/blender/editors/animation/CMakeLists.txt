@@ -43,7 +43,6 @@ set(SRC
 	anim_filter.c
 	anim_ipo_utils.c
 	anim_markers.c
-	anim_reduction.c
 	anim_ops.c
 	drivers.c
 	fmodifier_ui.c
