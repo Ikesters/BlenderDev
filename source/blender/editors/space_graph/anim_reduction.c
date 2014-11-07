@@ -109,28 +109,28 @@ typedef struct nStop {
 } nStop;
 
 
-void copyPath(int *tgt, int *src, int nPts) {
+void copyPath(int *tgt, int *src, int nPts) { // 
     for (int i = 0; i < nPts; i++) {
     	tgt[i] = src[i];
     }
 }
 
-void copyPathAndAdd(int * tgt, int * src, int nPts, int toAppend) {
+void copyPathAndAdd(int * tgt, int * src, int nPts, int toAppend) { //
     copyPath(tgt, src, nPts);
     tgt[nPts] = toAppend;
 }
 
-void nStopTableCopy(int nPtsSq, nStop a[nPtsSq], nStop b[nPtsSq]) {
+void nStopTableCopy(int nPtsSq, nStop a[nPtsSq], nStop b[nPtsSq]) { //
     for (int i = 0; i < nPtsSq; i++) {
         b[i].cost = a[i].cost;
         b[i].n = a[i].n;
 
-        b[i].path = malloc(b[i].n * sizeof *b[i].path); 
-        copyPath(b[i].path, a[i].path, a[i].n);
+        b[i].path = malloc(b[i].n * sizeof(int)); 
+        copyPath(b[i].path, a[i].path, b[i].n);
     }
 }
 
-float pointLineDist(BezHandle p, BezHandle q1, BezHandle q2) {
+float pointLineDist(BezHandle p, BezHandle q1, BezHandle q2) { //
 
 	float d_q2q1[3];
 	d_q2q1[0] = q2.x - q1.x;
@@ -140,7 +140,7 @@ float pointLineDist(BezHandle p, BezHandle q1, BezHandle q2) {
 	float d_q1p[3]; 
 	d_q1p[0] = q1.x - p.x;
 	d_q1p[1] = q1.y - p.y;
-	d_q1p[2] = q1.y - p.z;
+	d_q1p[2] = q1.z - p.z;
 	
 	float top[3];
 	cross_v3_v3v3(top, d_q2q1, d_q1p);
@@ -148,7 +148,7 @@ float pointLineDist(BezHandle p, BezHandle q1, BezHandle q2) {
 	return normalize_v3(top) / normalize_v3(d_q2q1);
 }
 
-float maxChordDistBetween(BezHandle *keyframes, int i, int j) {
+float maxChordDistBetween(BezHandle *keyframes, int i, int j) { //
     float maxDist = 0;
     
     BezHandle q1 = keyframes[i];
@@ -167,7 +167,7 @@ float maxChordDistBetween(BezHandle *keyframes, int i, int j) {
 }
 
 
-void initTable (int nPtsSq, nStop table[nPtsSq]) {
+void initTable (int nPtsSq, nStop table[nPtsSq]) { //
 	for (int i = 0; i < nPtsSq; i++) {
 		table[i].cost = 99999;
 		table[i].n = 0;
@@ -175,14 +175,14 @@ void initTable (int nPtsSq, nStop table[nPtsSq]) {
 }
 
 
-void makeZeroStopTable(int nPts, int nPtsSq, nStop e[nPtsSq], BezHandle *keyframes) {
+void makeZeroStopTable(int nPts, int nPtsSq, nStop e[nPtsSq], BezHandle *keyframes) { //
     for (int i = 0; i < nPts - 1; i++) {
         for (int j = i + 1; j < nPts; j++) {
         	int index = i * nPts + j;
             e[index].cost = maxChordDistBetween(keyframes, i, j);
             e[index].n = 2;
 
-            e[index].path = malloc(e[index].n * sizeof *e[index].path);  
+            e[index].path = malloc(e[index].n * sizeof(int));  
             e[index].path[0] = i;
             e[index].path[1] = j;
         }
@@ -245,14 +245,14 @@ int * makeNStopTable(int nPts, int nPtsSq, int maxN, int n, nStop nTable[nPtsSq]
 }
 
 
+
+
 /* Evaluates the curves between each selected keyframe on each frame, and keys the value  */
 void reduce_fcurve(FCurve *fcu, int count)
 {
-	BezTriple *bezt, *start = NULL, *end = NULL;
-	TempFrameValCache *value_cache, *fp;
-	int sfra, range;
-	int i, n, nIndex;
-
+    int i;
+	BezTriple *bezt;
+    
 	if (fcu->bezt == NULL) /* ignore baked */
 		return;
 	
@@ -277,17 +277,14 @@ void reduce_fcurve(FCurve *fcu, int count)
 
 	nStop zTable[nPtsSq];
     initTable(nPtsSq, zTable);
-
     makeZeroStopTable(nPts, nPtsSq, zTable, keyframes);
     
     nStop nTable[nPtsSq];
+    initTable(nPtsSq, nTable);
     nStopTableCopy(nPtsSq, zTable, nTable);
-
     
     int * path = makeNStopTable(nPts, nPtsSq, count - 3, 0, nTable, zTable);
     
-
-
 
     
     for (int i = 0; i < nPts * nPts; i++) {
@@ -307,6 +304,12 @@ void reduce_fcurve(FCurve *fcu, int count)
 	}
 
     calchandles_fcurve(fcu);
+
+
+
+
+    
+
 }
 
 /**
