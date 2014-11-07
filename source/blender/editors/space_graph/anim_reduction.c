@@ -25,7 +25,7 @@
  */
 
 /** \file blender/editors/animation/anim_reduction.c
- *  \ingroup edanimation
+ *  \ingroup ??
  */
 
 #ifdef _MSC_VER
@@ -128,10 +128,7 @@ void nStopTableCopy(int nPtsSq, nStop a[nPtsSq], nStop b[nPtsSq]) {
         b[i].path = malloc(b[i].n * sizeof *b[i].path); 
         copyPath(b[i].path, a[i].path, a[i].n);
     }
-    // printf("%s\n", "reduce_fcurve_keys - RICHARD D4a3, begun");
 }
-
-
 
 float pointLineDist(BezHandle p, BezHandle q1, BezHandle q2) {
 
@@ -146,23 +143,9 @@ float pointLineDist(BezHandle p, BezHandle q1, BezHandle q2) {
 	d_q1p[2] = q1.y - p.z;
 	
 	float top[3];
-	// float bot[3];
 	cross_v3_v3v3(top, d_q2q1, d_q1p);
-	// bot = d_q2q1;
 
 	return normalize_v3(top) / normalize_v3(d_q2q1);
-
-    // vec3 d_q2q1 = q2 - q1;
-    // vec3 d_q1p  = q1 - p;
-
-    // vec3 top = d_q2q1.cross(d_q1p);
-    // vec3 bot = d_q2q1;
-
-    // if (bot.norm() == 0) {
-    //     return top.norm();
-    // } else {
-    //     return top.norm() / bot.norm();
-    // }
 }
 
 float maxChordDistBetween(BezHandle *keyframes, int i, int j) {
@@ -191,17 +174,6 @@ void initTable (int nPtsSq, nStop table[nPtsSq]) {
 	} 
 }
 
-    // nStop **table = new nStop *[nPts];
-//     for(int i = 0; i <nPts; i++) {
-//         table[i] = new nStop[nPts];
-//         for(int j = 0; j <nPts; j++) {
-//             table[i][j].cost = 99999;
-//         }
-//     }
-
-    // return table;
-// }
-
 
 void makeZeroStopTable(int nPts, int nPtsSq, nStop e[nPtsSq], BezHandle *keyframes) {
     for (int i = 0; i < nPts - 1; i++) {
@@ -220,10 +192,6 @@ void makeZeroStopTable(int nPts, int nPtsSq, nStop e[nPtsSq], BezHandle *keyfram
 
 int * makeNStopTable(int nPts, int nPtsSq, int maxN, int n, nStop nTable[nPtsSq], nStop zTable[nPtsSq]) {
     if (n > maxN) {
-    	printf("Returning\n");
-    	for (int i = 0; i < nTable[nPts - 1].n; i++) { printf("ggg-, %d\n", nTable[nPts - 1].path[i]);}
-
-
     	int *path = malloc(nTable[nPts - 1].n * sizeof (int));
     	copyPath(path, nTable[nPts - 1].path, nTable[nPts - 1].n);
 
@@ -235,11 +203,8 @@ int * makeNStopTable(int nPts, int nPtsSq, int maxN, int n, nStop nTable[nPtsSq]
         return path;
     }
 
-    printf("Going\n");
-
     nStop nTableNext[nPtsSq];
     initTable(nPtsSq, nTableNext);
-    // nStopTableCopy(nPtsSq, nTable, nTableNext);
 
     for (int i = 0; i < nPts; i++) {
         for (int j = i + n + 1; j < nPts; j++) {
@@ -262,22 +227,17 @@ int * makeNStopTable(int nPts, int nPtsSq, int maxN, int n, nStop nTable[nPtsSq]
                     nTableNext[indexIJ].path = malloc(nTableNext[indexIJ].n * sizeof *nTableNext[indexIJ].path);  
 
                     copyPathAndAdd(nTableNext[indexIJ].path, nTable[indexIK].path, nTable[indexIK].n, j);
-                    for (int zzz=0; zzz<nTableNext[indexIJ].n; zzz++) {
-                    	printf("    rr-%d\n", nTableNext[indexIJ].path[zzz]);	
-                    } 
 
                 }
             }
         }
     }
 
-    printf("hi1\n");
     for (int i = 0; i < nPtsSq; i++) {
     	if (nTable[i].n > 0) {
     		free(nTable[i].path);
     	}
     }
-    printf("hi2\n");
 
 
     return makeNStopTable(nPts, nPtsSq, maxN, n + 1, nTableNext, zTable);
@@ -299,9 +259,7 @@ void reduce_fcurve(FCurve *fcu, int count)
 	/* Store keyframe locations in array */
 	BezHandle keyframes[fcu->totvert];
 
-
 	for (i = 0, bezt = fcu->bezt; i < fcu->totvert; i++, bezt++) {
-		// printf("    %2.2f, %2.2f\n", bezt->vec[1][0], bezt->vec[1][1]);
 		BezHandle bzh;
 		bzh.x = bezt->vec[1][0];
 		bzh.y = bezt->vec[1][1];
@@ -324,14 +282,6 @@ void reduce_fcurve(FCurve *fcu, int count)
     
     nStop nTable[nPtsSq];
     nStopTableCopy(nPtsSq, zTable, nTable);
-   	
-   	// printf("#points %d\n", nPtsSq);
-   	// for (int i = 0; i < nPtsSq; i++) {
-   	// 	printf("#i%d #points%d\n", i, nPtsSq);
-   	// 	// printf("%2.2f %d\n", nTable[i].cost, nTable[i].n);
-   	// 	for (int j = 0; j < nTable[i].n; j++) printf("HERE-, %d\n", nTable[i].path[j]);
-   	// }
-
 
     
     int * path = makeNStopTable(nPts, nPtsSq, count - 3, 0, nTable, zTable);
@@ -340,82 +290,23 @@ void reduce_fcurve(FCurve *fcu, int count)
 
 
     
-
-   printf("hi3\n");
-
     for (int i = 0; i < nPts * nPts; i++) {
-    	printf("hi4\n");
    		if (zTable[i].n > 0) {
     		free(zTable[i].path);
     	}
     }
-    printf("hi6\n");
+
 
 
 	clear_fcurve_keys(fcu);
-	for (int i = 0; i < count; i++) {
-		printf("RICH-, %d\n", path[i]);
 
+	for (int i = 0; i < count; i++) {
 		int frame = keyframes[path[i]].x;
 		float val = keyframes[path[i]].y;
 		insert_vert_fcurve(fcu, frame, val, 1);
 	}
+
     calchandles_fcurve(fcu);
-    
-
-	/* find selected keyframes... once pair has been found, add keyframes  */
-	// for (i = 0, bezt = fcu->bezt; i < fcu->totvert; i++, bezt++) {
-
-		/* check if selected, and which end this is */
-		// if (BEZSELECTED(bezt)) {
-		// 	if (start) {
-		// 		/* set end */
-		// 		end = bezt;
-				
-		// 		/* cache values then add keyframes using these values, as adding
-		// 		 * keyframes while sampling will affect the outcome...
-		// 		 *	- only start sampling+adding from index=1, so that we don't overwrite original keyframe
-		// 		 */
-		// 		range = (int)(ceil(end->vec[1][0] - start->vec[1][0]));
-		// 		sfra = (int)(floor(start->vec[1][0]));
-				
-		// 		if (range) {
-		// 			value_cache = MEM_callocN(sizeof(TempFrameValCache) * range, "IcuFrameValCache");
-					
-		// 			/* sample values */
-		// 			for (n = 1, fp = value_cache; n < range && fp; n++, fp++) {
-		// 				fp->frame = (float)(sfra + n);
-		// 				fp->val = evaluate_fcurve(fcu, fp->frame);
-		// 			}
-					
-		// 			/* add keyframes with these, tagging as 'breakdowns' */
-		// 			for (n = 1, fp = value_cache; n < range && fp; n++, fp++) {
-		// 				nIndex = insert_vert_fcurve(fcu, fp->frame, fp->val, 1);
-		// 				BEZKEYTYPE(fcu->bezt + nIndex) = BEZT_KEYTYPE_BREAKDOWN;
-		// 			}
-					
-		// 			/* free temp cache */
-		// 			MEM_freeN(value_cache);
-					
-		// 			/* as we added keyframes, we need to compensate so that bezt is at the right place */
-		// 			bezt = fcu->bezt + i + range - 1;
-		// 			i += (range - 1);
-		// 		}
-				
-		// 		/* bezt was selected, so it now marks the start of a whole new chain to search */
-		// 		start = bezt;
-		// 		end = NULL;
-		// 	}
-		// 	else {
-		// 		/* just set start keyframe */
-		// 		start = bezt;
-		// 		end = NULL;
-		// 	}
-		// }
-	// }
-	
-	/* recalculate channel's handles? */
-	// calchandles_fcurve(fcu);
 }
 
 /**
@@ -455,9 +346,11 @@ static int ed_reduction_opwrap_invoke_custom(bContext *C, wmOperator *op, const 
 }
 
 
-/* ******************** Sample Keyframes Operator *********************** */
-/* This operator 'bakes' the values of the curve into new keyframes between pairs
- * of selected keyframes. It is useful for creating keyframes for tweaking overlap.
+/* ******************** Reduce Operator *********************** */
+/* This operator reduces the number of keyframes used in the selected f-curves. To
+ * do this it uses the findSalient function to identify the most important keyframes.
+ *
+ * Once the findSalient code has complime
  */
 
 /* Evaluates the curves between each selected keyframe on each frame, and keys the value  */
@@ -483,12 +376,9 @@ static void reduce_fcurve_keys(bAnimContext *ac, int count)
 	// printf("%s\n", "reduce_fcurve_keys - RICHARD C2, completed");
 }
 
-
-/* reudction active fcurve */
+/* reduce selected fcurves */
 static int ed_reduction_reduce_exec(bContext *C, wmOperator *op)
 {
-	// printf("%s\n", "ed_reduction_reduce_exec - RICHARD A, begun");
-
 	bAnimContext ac;
 
 	/* get editor data */
@@ -496,30 +386,19 @@ static int ed_reduction_reduce_exec(bContext *C, wmOperator *op)
 		return OPERATOR_CANCELLED;
 	}
 	
-	/* sample keyframes */
-	int count = RNA_int_get(op->ptr, "count");
-	reduce_fcurve_keys(&ac, count);
+	/* run reduction function */
+	int keyCount = RNA_int_get(op->ptr, "KeyCount");
+	reduce_fcurve_keys(&ac, keyCount);
 	
 	/* set notifier that keyframes have changed */
 	WM_event_add_notifier(C, NC_ANIMATION | ND_KEYFRAME | NA_EDITED, NULL);
 	
-	// printf("%s\n", "ed_reduction_reduce_exec - RICHARD A, OPERATOR_FINISHED");
 	return OPERATOR_FINISHED;
-
-
-	// return OPERATOR_CANCELLED;
 }
 
 static int ed_reduction_reduce_invoke_wrapper(bContext *C, wmOperator *op, const wmEvent *event)
 {
-	/* must initialize the marker name first if there is a marker selected */
-	// TimeMarker *marker = ED_markers_get_first_selected(ED_context_get_markers(C));
-	// if (marker)
-	// RNA_string_set(op->ptr, "name", marker->name);
-	
-	// /* now see if the operator is usable */
-
-	// printf("%s\n", "ed_reduction_invoke_wrapper - RICHARD B");
+	/* now see if the operator is usable */
 	return ed_reduction_opwrap_invoke_custom(C, op, event, WM_operator_props_popup_confirm);
 }
 
@@ -535,14 +414,13 @@ static void REDUCTION_OT_reduce(wmOperatorType *ot)
 	/* api callbacks */
 	ot->invoke = ed_reduction_reduce_invoke_wrapper;
 	ot->exec = ed_reduction_reduce_exec;
-	// ot->poll = ED_operator_graphedit_active;
 	ot->poll = graphop_editable_keyframes_poll;
 	
 	/* flags */
 	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 	
 	/* properties */
-	ot->prop = RNA_def_int(ot->srna, "count", 8, 2, 100, "Count", "How many keyframes to reduce to.", 2, 100);
+	ot->prop = RNA_def_int(ot->srna, "KeyCount", 3, 3, 100, "Number of Keys", "How many keyframes to reduce to.", 3, 100);
 }
 
 
