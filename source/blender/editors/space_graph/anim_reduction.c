@@ -224,7 +224,7 @@ int * makeNStopTable(int nPts, int nPtsSq, int maxN, int n, nStop nTable[nPtsSq]
                     
                     nTableNext[indexIJ].cost = cost;
                     nTableNext[indexIJ].n = nTable[indexIK].n + 1;
-                    nTableNext[indexIJ].path = malloc(nTableNext[indexIJ].n * sizeof *nTableNext[indexIJ].path);  
+                    nTableNext[indexIJ].path = malloc(nTableNext[indexIJ].n * sizeof(int));  
 
                     copyPathAndAdd(nTableNext[indexIJ].path, nTable[indexIK].path, nTable[indexIK].n, j);
 
@@ -265,7 +265,12 @@ void reduce_fcurve(FCurve *fcu, int count)
 		bzh.y = bezt->vec[1][1];
 		bzh.z = 0;
 		keyframes[i] = bzh;
+
+        printf("keyframes -- ");
+        printf("x:%2.2f, y:%2.2f\n", bzh.x, bzh.y);
 	}
+
+
 
 	
 
