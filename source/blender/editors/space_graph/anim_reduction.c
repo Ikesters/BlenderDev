@@ -329,26 +329,48 @@ void reduce_fcurve(FCurve *fcu, int count)
 static int ed_reduction_opwrap_invoke_custom(bContext *C, wmOperator *op, const wmEvent *event,
                                              int (*invoke_func)(bContext *, wmOperator *, const wmEvent *))
 {
+    printf("HI\n");
+    
+    
 	ScrArea *sa = CTX_wm_area(C);
 	int retval = OPERATOR_PASS_THROUGH;
 	
 	/* removed check for Y coord of event, keymap has bounbox now */
 	
 	/* allow operator to run now */
-	if (invoke_func)
-		retval = invoke_func(C, op, event);
-	else if (op->type->exec)
+	if (invoke_func){
+        
+        retval = invoke_func(C, op, event);
+        printf("invoking pop up window\n");
+        // exit(0);
+    } else if (op->type->exec) {
+        printf("executing\n");
+        exit(0);
 		retval = op->type->exec(C, op);
-	else
+    } else {
+        printf("erroring\n");
+        exit(0);
 		BKE_report(op->reports, RPT_ERROR, "Programming error: operator does not actually have code to do anything!");
+    }
 		
 	/* return status modifications - for now, make this spacetype dependent as above */
 	if (sa->spacetype != SPACE_TIME) {
+
 		/* unless successful, must add "pass-through" to let normal operator's have a chance at tackling this event */
 		if ((retval & (OPERATOR_FINISHED | OPERATOR_INTERFACE)) == 0) {
+
+            printf("passing through while waiting for successful\n");
+            // exit(0);
+
 			retval |= OPERATOR_PASS_THROUGH;
 		}
+
+        // printf("nonsucess\n");
+        // exit(0);
 	}
+
+    printf("completed call\n");
+    // exit(0);
 	
 	return retval;
 }
@@ -387,6 +409,8 @@ static void reduce_fcurve_keys(bAnimContext *ac, int count)
 /* reduce selected fcurves */
 static int ed_reduction_reduce_exec(bContext *C, wmOperator *op)
 {
+    printf("EXECUTING REDUCE!!");
+    exit(0);
 	bAnimContext ac;
 
 	/* get editor data */
@@ -407,7 +431,7 @@ static int ed_reduction_reduce_exec(bContext *C, wmOperator *op)
 static int ed_reduction_reduce_invoke_wrapper(bContext *C, wmOperator *op, const wmEvent *event)
 {
 	/* now see if the operator is usable */
-	return ed_reduction_opwrap_invoke_custom(C, op, event, WM_operator_props_popup_confirm);
+	return ed_reduction_opwrap_invoke_custom(C, op, event, WM_operator_props_popup);
 }
 
 
