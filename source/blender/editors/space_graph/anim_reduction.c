@@ -73,10 +73,24 @@
 #include "graph_intern.h"
 
 
+/* Utilities -------------------------------------------------------------------------------------------------------- */
+
+bool ED_reduction_is_in_array(int val, int *arr, int size)
+{
+	int i;
+	for (i = 0; i < size; i++) {
+		if (arr[i] == val)
+			return true;
+	}
+	return false;
+}
+
+
 /* F-Curve Roughness Anaylsis --------------------------------------------------------------------------------------- */
 
 /* Sums the roughness at each point the given fcurve */
-double roughnessOfCurve(FCurve *fcu) {
+double ED_reduction_get_fcurve_roughness(FCurve *fcu)
+{
 	int npts = fcu->totvert;
 	int i;
 	BezTriple *bezt;
@@ -98,243 +112,232 @@ double roughnessOfCurve(FCurve *fcu) {
 	return totalRoughness;
 }
 
-/* Keyframe Reduction ----------------------------------------------------------------------------------------------- */
-
-/* Stop Tables */
-
-typedef struct NStop {
-	float cost;
-	int n;
-	int * path;
-} NStop;
-
-void copyPath(int * tgt, int * src, int nPts) { // 
-	for (int i = 0; i < nPts; i++) {
-		tgt[i] = src[i];
-	}
-}
-
-void copyPathAndAdd(int * tgt, int * src, int nPts, int toAppend) { //
-	copyPath(tgt, src, nPts);
-	tgt[nPts] = toAppend;
-}
-
-void initTable(int nPtsSq, NStop table[nPtsSq]) { //
-	for (int i = 0; i < nPtsSq; i++) {
-		table[i].cost = 99999;
-		table[i].n = 0;
-	} 
-}
-
-void nStopTableCopy(int nPtsSq, NStop a[nPtsSq], NStop b[nPtsSq]) { //
-	for (int i = 0; i < nPtsSq; i++) {
-		b[i].cost = a[i].cost;
-		b[i].n = a[i].n;
-
-		b[i].path = malloc(b[i].n * sizeof(int)); 
-		copyPath(b[i].path, a[i].path, b[i].n);
-	}
-}
-
-/* Cost Analysis */
+/* Keyframe Placement Analysis -------------------------------------------------------------------------------------- */
 
 typedef struct Frame {
 	double f;
 	double v;
 } Frame;
 
-double pointLineDist(Frame p, Frame q1, Frame q2) { //	
-	double x0 =  p.f;
-	double x1 = q1.f;
-	double x2 = q2.f;
-	
-	double y0 =  p.v;
-	double y1 = q1.v;
-	double y2 = q2.v;
-
-	double numer = fabs((x2 - x1) * (y1 - y0) - (x1 - x0) * (y2 - y1));
-	double denom = sqrt(pow(x2 - x1, 2) + pow(y2 - y1, 2));
+double ED_reduction_choord_to_frame_cost(Frame p, Frame q1, Frame q2)
+{
+	double numer = fabs((q2.f - q1.f) * (q1.v - p.v) - (q1.f - p.f) * (q2.v - q1.v));
+	double denom = sqrt(pow(q2.f - q1.f, 2) + pow(q2.v - q1.v, 2));
 
 	if (denom == 0) { return numer; }
 	else { return numer / denom; }
 }
 
-float maxChordDistBetween(Frame * frames, int i, int j) { //
-	float maxDist = 0;
-	
-	Frame q1 = frames[i];
-	Frame q2 = frames[j];
+double ED_reduction_path_cost(Frame *frames, int startF, int endF)
+{
+	double maxDist = 0;
 
-	for (int k = i; k < j; k++) {
-		Frame p = frames[k];
-
-		float dist = pointLineDist(p, q1, q2);
-		if (dist > maxDist) {
+	for (int i = startF; i < endF; i++) {
+		double dist = ED_reduction_choord_to_frame_cost(frames[i], frames[startF], frames[endF]);
+		
+		if (dist > maxDist)
 			maxDist = dist;
-		}
 	}
 
 	return maxDist;
 }
 
-/* Reduction Algorithm */
+/* NStop Tables ------------------------------------------------------------------------------------------------------ */
 
+typedef struct NStop {
+	float cost;
+	int n;
+	int *path;
+} NStop;
 
-void makeZeroStopTable(int nPts, int nPtsSq, NStop e[nPtsSq], Frame * frames) { //
-	for (int i = 0; i < nPts - 1; i++) {
-		for (int j = i + 1; j < nPts; j++) {
-			int index = i * nPts + j;
-			e[index].cost = maxChordDistBetween(frames, i, j);
-			e[index].n = 2;
+void ED_reduction_copy_stoptable_path(int *tgt, int *src, int npts)
+{
+	for (int i = 0; i < npts; i++) {
+		tgt[i] = src[i];
+	}
+}
 
-			e[index].path = malloc(e[index].n * sizeof(int));  
-			e[index].path[0] = i;
-			e[index].path[1] = j;
+void ED_reduction_copy_stoptable_path_and_add(int *tgt, int *src, int npts, int v)
+{
+	ED_reduction_copy_stoptable_path(tgt, src, npts);
+	tgt[npts] = v;
+}
+
+void ED_reduction_init_stoptable(int npts_sq, NStop table[npts_sq])
+{
+	for (int i = 0; i < npts_sq; i++) {
+		table[i].cost = 99999;
+		table[i].n = 0;
+	} 
+}
+
+void ED_reduction_copy_stoptable(int npts_sq, NStop a[npts_sq], NStop b[npts_sq])
+{
+	for (int i = 0; i < npts_sq; i++) {
+		b[i].cost = a[i].cost;
+		b[i].n = a[i].n;
+
+		b[i].path = malloc(b[i].n * sizeof(int)); 
+		ED_reduction_copy_stoptable_path(b[i].path, a[i].path, b[i].n);
+	}
+}
+
+void ED_reduction_delete_stoptable(int npts_sq, NStop table[npts_sq])
+{
+	for (int i = 0; i < npts_sq; i++) {
+		if (table[i].n > 0) {	
+			free(table[i].path);
 		}
 	}
 }
 
+void ED_reduction_zero_stoptable(int npts, int npts_sq, NStop table[npts_sq], Frame *frames)
+{
+	for (int i = 0; i < npts - 1; i++) {
+		for (int j = i + 1; j < npts; j++) {
+			
+			int index = i * npts + j;
+			table[index].cost = ED_reduction_path_cost(frames, i, j);
+			table[index].n = 2;
 
-int * iterateStopTable(int nPts, int nPtsSq, int nStops, int n, NStop nTable[nPtsSq], NStop zTable[nPtsSq]) {
-	if (nTable[nPts - 1].n == nStops) {
-		int * path = malloc(nTable[nPts - 1].n * sizeof (int));
-		copyPath(path, nTable[nPts - 1].path, nTable[nPts - 1].n);
-
-		for (int i = 0; i < nPtsSq; i++) {
-			if (nTable[i].n > 0) {	
-				free(nTable[i].path);
-			}
+			table[index].path = malloc(table[index].n * sizeof(int));  
+			table[index].path[0] = i;
+			table[index].path[1] = j;
 		}
-		return path;
 	}
+}
 
-	NStop nTableNext[nPtsSq];
-	initTable(nPtsSq, nTableNext);
+void ED_reduction_n_stoptable(int npts, int npts_sq, int n_stops, int n, NStop nTable[npts_sq], NStop zTable[npts_sq])
+{
+	if (nTable[npts - 1].n == n_stops)
+		return;
 
-	for (int i = 0; i < nPts; i++) {
-		for (int j = i + n + 1; j < nPts; j++) {
+	NStop tmp_table[npts_sq];
+	ED_reduction_init_stoptable(npts_sq, tmp_table);
 
-			int indexIJ = i * nPts + j;
+	for (int i = 0; i < npts; i++) {
+		for (int j = i + n + 1; j < npts; j++) {
+			int indexIJ = i * npts + j;
 
+			// Find the least cost path between i and j
 			float minCost = 99999;
-
 			for (int k = i + 1; k < j; k++) {
-				int indexIK = i * nPts + k;
-				int indexKJ = k * nPts + j;
-
+				int indexIK = i * npts + k;
+				int indexKJ = k * npts + j;
 				float cost = max_ff(nTable[indexIK].cost, zTable[indexKJ].cost);
+
+				// If the path cost is less, update the best cost information
 				if (cost < minCost) {
-					minCost = cost;
-
-					
-					nTableNext[indexIJ].cost = cost;
-					nTableNext[indexIJ].n = nTable[indexIK].n + 1;
-					nTableNext[indexIJ].path = malloc(nTableNext[indexIJ].n * sizeof(int));  
-
-					copyPathAndAdd(nTableNext[indexIJ].path, nTable[indexIK].path, nTable[indexIK].n, j);
-
+					minCost = cost;	
+					tmp_table[indexIJ].cost = cost;
+					tmp_table[indexIJ].n = nTable[indexIK].n + 1;
+					tmp_table[indexIJ].path = malloc(tmp_table[indexIJ].n * sizeof(int));  
+					ED_reduction_copy_stoptable_path_and_add(tmp_table[indexIJ].path, nTable[indexIK].path, nTable[indexIK].n, j);
 				}
 			}
 		}
 	}
 
-	for (int i = 0; i < nPtsSq; i++) {
-		if (nTable[i].n > 0) {
-			free(nTable[i].path);
-		}
-	}
-
-
-	return iterateStopTable(nPts, nPtsSq, nStops, n + 1, nTableNext, zTable);
-
+	ED_reduction_delete_stoptable(npts_sq, nTable);
+	ED_reduction_copy_stoptable(npts_sq, tmp_table, nTable);
+	ED_reduction_n_stoptable(npts, npts_sq, n_stops, n + 1, nTable, zTable);
 }
 
-/* Evaluates the curves between each selected keyframe on each frame, and keys the value  */
-int * getSalientFrames(FCurve *fcu, int count)
+/* Reduction API ---------------------------------------------------------------------------------------------------- */
+
+int *ED_reduction_pick_best_frames_fcurve(FCurve *fcu, int n_stops)
 {
 	int i;
 	BezTriple *bezt;
-	
-	/* Store keyframe locations in array */
-	Frame frames[fcu->totvert];
 
+	int npts = fcu->totvert;
+	int npts_sq = npts * npts;
+
+	/* Extract frame data */
+	Frame frames[fcu->totvert];
 	for (i = 0, bezt = fcu->bezt; i < fcu->totvert; i++, bezt++) {
-		Frame frame;
-		frame.f = bezt->vec[1][0];
-		frame.v = bezt->vec[1][1];
-		frames[i] = frame;
+		frames[i] = (Frame) { bezt->vec[1][0], bezt->vec[1][1] };
 	}
 
+	/* Build stop tables */
+	NStop zTable[npts_sq];
+	NStop nTable[npts_sq];
+	ED_reduction_init_stoptable(npts_sq, zTable);
+	ED_reduction_zero_stoptable(npts, npts_sq, zTable, frames);
+	ED_reduction_init_stoptable(npts_sq, nTable);
+	ED_reduction_copy_stoptable(npts_sq, zTable, nTable);
+	ED_reduction_n_stoptable(npts, npts_sq, n_stops, 0, nTable, zTable);
 
-	int nPts = fcu->totvert;
-	int nPtsSq = nPts * nPts;
+	/* Store frame indicies */
+	int *frameIndicies = malloc(nTable[npts - 1].n * sizeof (int));
+	ED_reduction_copy_stoptable_path(frameIndicies, nTable[npts - 1].path, nTable[npts - 1].n);
+	
+	/* Clean up */
+	ED_reduction_delete_stoptable(npts_sq, zTable);
+	ED_reduction_delete_stoptable(npts_sq, nTable);
+	
+	return frameIndicies;
+}
 
-	NStop zTable[nPtsSq];
-	initTable(nPtsSq, zTable);
-	makeZeroStopTable(nPts, nPtsSq, zTable, frames);
-	
-	NStop nTable[nPtsSq];
-	initTable(nPtsSq, nTable);
-	nStopTableCopy(nPtsSq, zTable, nTable);
-	
-	int * frameIndicies = iterateStopTable(nPts, nPtsSq, count, 0, nTable, zTable);
-	
-	
-	
-	for (int i = 0; i < nPts * nPts; i++) {
-		if (zTable[i].n > 0) {
-			free(zTable[i].path);
+int *ED_reduction_pick_best_frames_fcurves(ListBase anim_data, int n_stops)
+{
+	bAnimListElem *ale;
+	int i;
+
+	/* Get the index of the roughest curve  */
+	double maxRoughness = 0;
+	int maxRoughnessIndex = 0;
+	for (i = 0, ale = anim_data.first; ale; i++, ale = ale->next) {
+		double roughness = ED_reduction_get_fcurve_roughness((FCurve *)ale->key_data);
+		if (roughness > maxRoughness) {
+			maxRoughness = roughness;
+			maxRoughnessIndex = i;
 		}
 	}
 
-	return frameIndicies;
+	/* Get the best placement of n keyframes for the roughest curve */
+	int * frameIndicies;
 
-
-}
-
-/* FCurve Modification */
-
-bool isvalueinarray(int val, int *arr, int size){
-	int i;
-	for (i=0; i < size; i++) {
-		if (arr[i] == val)
-			return true;
+	/* ??? How can I access the bAnimListElem at a given index? */
+	for (i = 0, ale = anim_data.first; ale; i++, ale = ale->next) {
+		if (i == maxRoughnessIndex)
+			frameIndicies = ED_reduction_pick_best_frames_fcurve((FCurve *)ale->key_data, n_stops);
 	}
-	return false;
+	return frameIndicies;
 }
 
-void setSalientFrames(FCurve *fcu, int * salientPath, int nStops) {
-
+void ED_reduction_reduce_fcurve_to_frames(FCurve *fcu, int *frameIndicies, int n_stops)
+{
 	int i;
-	BezTriple * bezt;
+	BezTriple *bezt;
 
-	double salientFrames[nStops];
-	double salientValues[nStops];
-
+	/* Cache data for each frame in given indicies */
+	Frame frames[n_stops];
 	int index = 0;
 	for (i = 0, bezt = fcu->bezt; i < fcu->totvert; i++, bezt++) {
-		if (isvalueinarray(i, salientPath, nStops)) {
-			salientFrames[index] = bezt->vec[1][0];
-			salientValues[index] = bezt->vec[1][1];
+		if (ED_reduction_is_in_array(i, frameIndicies, n_stops)) {
+			frames[index] = (Frame) { bezt->vec[1][0], bezt->vec[1][1] };
 			index ++;
 		}
 	}
 
-	printf("RR - setting frames\n");
-
+	/* Delete all keys, and then rebuild curves using cache */
 	clear_fcurve_keys(fcu);
-	for (int i = 0; i < nStops; i++) {	
-		int frame = salientFrames[i];
-		float val = salientValues[i];
-
-		printf("%d||%2.2f\n", frame, val);
-		insert_vert_fcurve(fcu, frame, val, 1);
-	}
-
+	for (i = 0; i < n_stops; i++)
+		insert_vert_fcurve(fcu, frames[i].f, frames[i].v, 1);
 	calchandles_fcurve(fcu);
-
-	printf("RR - completed setSalientFrames()\n");
 }
+
+void ED_reduction_reduce_fcurves_to_frames(ListBase anim_data, int *frameIndicies, int n_stops)
+{
+	bAnimListElem *ale;
+
+	for (ale = anim_data.first; ale; ale = ale->next) {
+		ED_reduction_reduce_fcurve_to_frames((FCurve *)ale->key_data, frameIndicies, n_stops);
+	}
+}
+
+
 
 /* Reduce FCurve Operator ------------------------------------------------------------------------------------------- */
 
@@ -349,49 +352,22 @@ void setSalientFrames(FCurve *fcu, int * salientPath, int nStops) {
  */
 static int ed_reduction_opwrap_invoke_custom(bContext *C, wmOperator *op, const wmEvent *event,
 											 int (*invoke_func)(bContext *, wmOperator *, const wmEvent *))
-{
-	printf("HI\n");
-	
+{	
 	
 	ScrArea *sa = CTX_wm_area(C);
 	int retval = OPERATOR_PASS_THROUGH;
 	
-	/* removed check for Y coord of event, keymap has bounbox now */
-	
-	/* allow operator to run now */
-	if (invoke_func){
-		
+	if (invoke_func)
 		retval = invoke_func(C, op, event);
-		printf("invoking pop up window\n");
-		// exit(0);
-	} else if (op->type->exec) {
-		printf("executing\n");
-		exit(0);
+	else if (op->type->exec)
 		retval = op->type->exec(C, op);
-	} else {
-		printf("erroring\n");
-		exit(0);
+	else
 		BKE_report(op->reports, RPT_ERROR, "Programming error: operator does not actually have code to do anything!");
-	}
 		
-	/* return status modifications - for now, make this spacetype dependent as above */
 	if (sa->spacetype != SPACE_TIME) {
-
-		/* unless successful, must add "pass-through" to let normal operator's have a chance at tackling this event */
-		if ((retval & (OPERATOR_FINISHED | OPERATOR_INTERFACE)) == 0) {
-
-			printf("passing through while waiting for successful\n");
-			// exit(0);
-
+		if ((retval & (OPERATOR_FINISHED | OPERATOR_INTERFACE)) == 0)
 			retval |= OPERATOR_PASS_THROUGH;
-		}
-
-		// printf("nonsucess\n");
-		// exit(0);
 	}
-
-	printf("completed call\n");
-	// exit(0);
 	
 	return retval;
 }
@@ -405,9 +381,8 @@ static int ed_reduction_opwrap_invoke_custom(bContext *C, wmOperator *op, const 
  */
 
 /* Evaluates the curves between each selected keyframe on each frame, and keys the value  */
-static void reduce_fcurve_keys(bAnimContext *ac, int count)
+static void reduce_fcurve_keys(bAnimContext *ac, int n_keyframes)
 {	
-	// printf("%s\n", "reduce_fcurve_keys - RICHARD A, begun");
 	ListBase anim_data = {NULL, NULL};
 	bAnimListElem *ale;
 	int filter;
@@ -415,54 +390,19 @@ static void reduce_fcurve_keys(bAnimContext *ac, int count)
 	/* filter data */
 	filter = (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_CURVE_VISIBLE | ANIMFILTER_FOREDIT | ANIMFILTER_NODUPLIS | ANIMFILTER_SEL);
 	ANIM_animdata_filter(ac, &anim_data, filter, ac->data, ac->datatype);
-	
-	/* find the roughest curve  */
-	double maxE = 0; int maxIndex = 0;
-	int i = 0;
-	for (ale = anim_data.first; ale; ale = ale->next) {
-		double e = roughnessOfCurve((FCurve *)ale->key_data);
-		if (e > maxE) { maxE = e; maxIndex = i; }
 
-		// printf("i%d||e%2.2f\n", i, e);
+	/* pick best salient points, then reduce each curve */
+	int *frameIndicies = ED_reduction_pick_best_frames_fcurves(anim_data, n_keyframes);
+	ED_reduction_reduce_fcurves_to_frames(anim_data, frameIndicies, n_keyframes);
 
-		i++;
-
-		
-
-	}
-
-	// printf("maxI%d||maxE%2.2f\n", maxIndex, maxE);
-
-	/* pick salient frames */
-	i = 0;
-	int * frameIndicies;
-	for (ale = anim_data.first; ale; ale = ale->next) {
-		if (i == maxIndex) {
-			frameIndicies = getSalientFrames((FCurve *)ale->key_data, count);		
-
-			for (int j = 0; j < count; j++) {
-				printf("    %d \n", frameIndicies[j]);
-			}
-		}
-		i++;
-	}
-	
-	for (ale = anim_data.first; ale; ale = ale->next) {
-		setSalientFrames((FCurve *)ale->key_data, frameIndicies, count);
-	}
-
-
-	// ale->update |= ANIM_UPDATE_DEPS;
-
-	// ANIM_animdata_update(ac, &anim_data);
-	// ANIM_animdata_freelist(&anim_data);
+	// ale->update |= ANIM_UPDATE_DEPS; ???
+	ANIM_animdata_update(ac, &anim_data);
+	ANIM_animdata_freelist(&anim_data);
 }
 
 /* reduce selected fcurves */
 static int ed_reduction_reduce_exec(bContext *C, wmOperator *op)
 {
-	printf("EXECUTING REDUCE!!");
-	// exit(0);
 	bAnimContext ac;
 
 	/* get editor data */
@@ -508,7 +448,7 @@ static void REDUCTION_OT_reduce(wmOperatorType *ot)
 }
 
 
-/* registration ----------------------------------------------------------------------------------------------------- */
+/* Registration ----------------------------------------------------------------------------------------------------- */
 
 void ED_operatortypes_reduction(void)
 {

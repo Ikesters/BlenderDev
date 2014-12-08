@@ -31,16 +31,47 @@
 #ifndef __ED_REDUCTION_H__
 #define __ED_REDUCTION_H__
 
-/* Drawing API ------------------------------ */
+
+/* Utilities ---------------------------------------------------------------- */
+
+bool ED_reduction_is_in_array(int val, int *arr, int size);
 
 
-/* Backend API ----------------------------- */
+/* F-Curve Roughness Anaylsis ----------------------------------------------- */
+
+double ED_reduction_get_fcurve_roughness(struct FCurve *fcu);
 
 
-/* Operators ------------------------------ */
+/* Keyframe Placement Analysis ---------------------------------------------- */
 
-/* called in screen_ops.c:ED_operatortypes_screen() */
+struct Frame;
+
+double ED_reduction_choord_to_frame_cost(struct Frame p, struct Frame q1, struct Frame q2);
+double ED_reduction_path_cost(struct Frame *frames, int i, int j);
+
+
+/* NStop Tables ------------------------------------------------------------- */
+
+struct NStop;
+
+void ED_reduction_copy_stoptable_path(int *tgt, int *src, int npts);
+void ED_reduction_copy_stoptable_path_and_add(int *tgt, int *src, int npts, int v);
+void ED_reduction_init_stoptable(int npts_sq, struct NStop *table);
+void ED_reduction_copy_stoptable(int npts_sq, struct NStop *a, struct NStop *b);
+void ED_reduction_delete_stoptable(int npts_sq, struct NStop *table);
+
+void ED_reduction_zero_stoptable(int nPts, int npts_sq, struct NStop * table, struct Frame *frames);
+void ED_reduction_n_stoptable(int npts, int npts_sq, int n_stops, int n, struct NStop *nTable, struct NStop *zTable);
+
+
+/* Reduction ---------------------------------------------------------------- */
+
+int *ED_reduction_pick_best_frames_fcurve(struct FCurve *fcu, int n_stops);
+int *ED_reduction_pick_best_frames_fcurves(ListBase anim_data, int n_stops);
+void ED_reduction_reduce_fcurve_to_frames(struct FCurve *fcu, int *frameIndicies, int n_stops);
+void ED_reduction_reduce_fcurves_to_frames(ListBase anim_data, int *frameIndicies, int n_stops);
+
+/* Registration, called in screen_ops.c:ED_operatortypes_screen() */
 void ED_operatortypes_reduction(void); 
-
 
 #endif /* __ED_REDUCTION_H__ */
