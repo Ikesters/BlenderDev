@@ -166,7 +166,7 @@ void ED_reduction_copy_stoptable_path_and_add(int *tgt, int *src, int npts, int 
 void ED_reduction_init_stoptable(int npts_sq, NStop table[npts_sq])
 {
 	for (int i = 0; i < npts_sq; i++) {
-		table[i].cost = INT_MAX;
+		table[i].cost = 99999;
 		table[i].n = 0;
 	} 
 }

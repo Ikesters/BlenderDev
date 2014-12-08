@@ -70,6 +70,7 @@
 #include "ED_screen.h"
 #include "ED_transform.h"
 #include "ED_markers.h"
+#include "ED_reduction.h"
 
 #include "WM_api.h"
 #include "WM_types.h"
@@ -1023,7 +1024,6 @@ void GRAPH_OT_clean(wmOperatorType *ot)
 static void reduce_keyframes(bAnimContext *ac, int key_count)
 {   
     ListBase anim_data = {NULL, NULL};
-    bAnimListElem *ale;
     int filter;
     
     /* filter data */
@@ -1031,6 +1031,8 @@ static void reduce_keyframes(bAnimContext *ac, int key_count)
     ANIM_animdata_filter(ac, &anim_data, filter, ac->data, ac->datatype);
 
     /* Reduce keyframes */
+
+    printf("KEYCOUNT HERE %d\n", key_count);
     int *frameIndicies = ED_reduction_pick_best_frames_fcurves(anim_data, key_count);
     ED_reduction_reduce_fcurves_to_frames(anim_data, frameIndicies, key_count);
 
@@ -1050,7 +1052,7 @@ static int reduce_keyframes_exec(bContext *C, wmOperator *op)
         return OPERATOR_CANCELLED;
         
     /* get reduce key count */
-    key_count = RNA_float_get(op->ptr, "KeyCount");
+    key_count = RNA_int_get(op->ptr, "KeyCount");
     
     /* reduce keyframes */
     reduce_keyframes(&ac, key_count);
@@ -1080,7 +1082,6 @@ static int reduce_keyframes_invoke_wrapper(bContext *C, wmOperator *op, const wm
     
     return retval;
 }
-
  
 void GRAPH_OT_reduce(wmOperatorType *ot)
 {
@@ -1090,6 +1091,7 @@ void GRAPH_OT_reduce(wmOperatorType *ot)
     ot->description = "Reduce the number of keyframes in the selected F-Curves";
     
     /* api callbacks */
+    ot->invoke = reduce_keyframes_invoke_wrapper;
     ot->exec = reduce_keyframes_exec;
     ot->poll = graphop_editable_keyframes_poll;
     

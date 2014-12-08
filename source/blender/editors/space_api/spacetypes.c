@@ -56,7 +56,6 @@
 #include "ED_paint.h"
 #include "ED_physics.h"
 #include "ED_render.h"
-#include "ED_reduction.h"
 #include "ED_screen.h"
 #include "ED_sculpt.h"
 #include "ED_space_api.h"
@@ -115,7 +114,6 @@ void ED_spacetypes_init(void)
 	ED_operatortypes_curve();
 	ED_operatortypes_armature();
 	ED_operatortypes_marker();
-	ED_operatortypes_reduction();
 	ED_operatortypes_metaball();
 	ED_operatortypes_sound();
 	ED_operatortypes_render();

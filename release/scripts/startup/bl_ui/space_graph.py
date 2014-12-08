@@ -72,7 +72,6 @@ class GRAPH_MT_editor_menus(Menu):
         layout.menu("GRAPH_MT_view")
         layout.menu("GRAPH_MT_select")
         layout.menu("GRAPH_MT_marker")
-        layout.menu("GRAPH_MT_reduction")
         layout.menu("GRAPH_MT_channel")
         layout.menu("GRAPH_MT_key")
 
@@ -168,15 +167,6 @@ class GRAPH_MT_marker(Menu):
 
         # TODO: pose markers for action edit mode only?
 
-class GRAPH_MT_reduction(Menu):
-    bl_label = "Reduction"
-
-    def draw(self, context):
-        layout = self.layout
-
-        from bl_ui.space_time import reduction_menu_generic
-        reduction_menu_generic(layout)
-
 
 class GRAPH_MT_channel(Menu):
     bl_label = "Channel"
@@ -246,6 +236,7 @@ class GRAPH_MT_key(Menu):
         layout.operator("graph.smooth")
         layout.operator("graph.sample")
         layout.operator("graph.bake")
+        layout.operator("graph.reduce")
 
         layout.separator()
         layout.operator("graph.copy")

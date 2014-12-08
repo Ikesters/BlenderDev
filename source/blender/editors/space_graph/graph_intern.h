@@ -103,6 +103,7 @@ void GRAPH_OT_paste(struct wmOperatorType *ot);
 void GRAPH_OT_duplicate(struct wmOperatorType *ot);
 void GRAPH_OT_delete(struct wmOperatorType *ot);
 void GRAPH_OT_clean(struct wmOperatorType *ot);
+void GRAPH_OT_reduce(struct wmOperatorType *ot);
 void GRAPH_OT_sample(struct wmOperatorType *ot);
 void GRAPH_OT_bake(struct wmOperatorType *ot);
 void GRAPH_OT_sound_bake(struct wmOperatorType *ot);
