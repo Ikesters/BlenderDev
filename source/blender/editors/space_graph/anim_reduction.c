@@ -35,18 +35,18 @@
 #include <math.h>
 #include <stdlib.h>
 #include <string.h>
-#include <float.h>
+#include <stdio.h>
 
-#include "MEM_guardedalloc.h"
+// #include "MEM_guardedalloc.h"
 
 #include "DNA_scene_types.h"
 #include "DNA_object_types.h"
 #include "DNA_anim_types.h"
 
 #include "BLI_blenlib.h"
-#include "BLI_math.h"
+// #include "BLI_math.h"
 #include "BLI_math_base.h"
-#include "BLI_utildefines.h"
+// #include "BLI_utildefines.h"
 
 #include "BKE_context.h"
 #include "BKE_fcurve.h"
@@ -54,13 +54,13 @@
 #include "BKE_report.h"
 #include "BKE_scene.h"
 #include "BKE_screen.h"
-#include "BKE_unit.h"
+// #include "BKE_unit.h"
 #include "BKE_global.h"
-#include "BKE_nla.h"
-#include "BKE_library.h"
+// #include "BKE_nla.h"
+// #include "BKE_library.h"
 
 
-#include "BLF_translation.h"
+// #include "BLF_translation.h"
 
 #include "RNA_access.h"
 #include "RNA_define.h"
@@ -69,47 +69,67 @@
 #include "WM_api.h"
 #include "WM_types.h"
 
-#include "BIF_gl.h"
-#include "BIF_glutil.h"
+// #include "BIF_gl.h"
+// #include "BIF_glutil.h"
 
-#include "UI_interface.h"
-#include "UI_interface_icons.h"
-#include "UI_view2d.h"
-#include "UI_resources.h"
+// #include "UI_interface.h"
+// #include "UI_interface_icons.h"
+// #include "UI_view2d.h"
+// #include "UI_resources.h"
 
 #include "ED_anim_api.h"
-#include "ED_reduction.h"
+// #include "ED_reduction.h"
 #include "ED_screen.h"
 #include "ED_util.h"
 #include "ED_numinput.h"
-#include "ED_object.h"
-#include "ED_transform.h"
+// #include "ED_object.h"
+// #include "ED_transform.h"
 #include "ED_types.h"
 #include "ED_keyframing.h"
 #include "ED_keyframes_edit.h"
-#include "ED_markers.h"
+// #include "ED_markers.h"
 
 #include "graph_intern.h"
 
+#include "ED_reduction.h"
 
 
-/* little cache for values... */
-typedef struct TempFrameValCache {
-	float frame, val;
-} TempFrameValCache;
+typedef struct Frame {
+	double f;
+	double v;
+} Frame;
 
-typedef struct BezHandle {
-	float x, y, z;
-} BezHandle;
+// typedef struct AnimCurve {
+// 	int numFrames;
+// 	double energy;
+// 	Frame * frames;
+// } AnimCurve;
 
-typedef struct nStop {
+typedef struct NStop {
     float cost;
     int n;
-    int *path;
-} nStop;
+    int * path;
+} NStop;
+
+#ifndef max
+	#define max( a, b ) ( ((a) > (b)) ? (a) : (b) )
+#endif
 
 
-void copyPath(int *tgt, int *src, int nPts) { // 
+/* Tmp API ----------------------------- */
+
+// void logAnimCurve(AnimCurve ac, char * msg) {
+// 	printf("\n\nCurve %s, e=%2.2f\n", msg, ac.energy);
+// 	for (int i = 0; i < ac.numFrames; i++) {
+// 		Frame p = ac.frames[i];
+// 		printf("P%d: f:%2.2f v:%2.2f \n", i, p.f, p.v);
+// 	}
+// }
+
+/* ??? ----------------------------- */
+
+
+void copyPath(int * tgt, int * src, int nPts) { // 
     for (int i = 0; i < nPts; i++) {
     	tgt[i] = src[i];
     }
@@ -120,7 +140,7 @@ void copyPathAndAdd(int * tgt, int * src, int nPts, int toAppend) { //
     tgt[nPts] = toAppend;
 }
 
-void nStopTableCopy(int nPtsSq, nStop a[nPtsSq], nStop b[nPtsSq]) { //
+void nStopTableCopy(int nPtsSq, NStop a[nPtsSq], NStop b[nPtsSq]) { //
     for (int i = 0; i < nPtsSq; i++) {
         b[i].cost = a[i].cost;
         b[i].n = a[i].n;
@@ -130,32 +150,30 @@ void nStopTableCopy(int nPtsSq, nStop a[nPtsSq], nStop b[nPtsSq]) { //
     }
 }
 
-float pointLineDist(BezHandle p, BezHandle q1, BezHandle q2) { //
-
-	float d_q2q1[3];
-	d_q2q1[0] = q2.x - q1.x;
-	d_q2q1[1] = q2.y - q1.y;
-	d_q2q1[2] = q2.z - q1.z;
-
-	float d_q1p[3]; 
-	d_q1p[0] = q1.x - p.x;
-	d_q1p[1] = q1.y - p.y;
-	d_q1p[2] = q1.z - p.z;
+double pointLineDist(Frame p, Frame q1, Frame q2) { //	
+	double x0 =  p.f;
+	double x1 = q1.f;
+	double x2 = q2.f;
 	
-	float top[3];
-	cross_v3_v3v3(top, d_q2q1, d_q1p);
+	double y0 =  p.v;
+	double y1 = q1.v;
+	double y2 = q2.v;
 
-	return normalize_v3(top) / normalize_v3(d_q2q1);
+	double numer = fabs((x2 - x1) * (y1 - y0) - (x1 - x0) * (y2 - y1));
+	double denom = sqrt(pow(x2 - x1, 2) + pow(y2 - y1, 2));
+
+	if (denom == 0) { return numer; }
+	else { return numer / denom; }
 }
 
-float maxChordDistBetween(BezHandle *keyframes, int i, int j) { //
+float maxChordDistBetween(Frame * frames, int i, int j) { //
     float maxDist = 0;
     
-    BezHandle q1 = keyframes[i];
-    BezHandle q2 = keyframes[j];
+    Frame q1 = frames[i];
+    Frame q2 = frames[j];
 
     for (int k = i; k < j; k++) {
-        BezHandle p = keyframes[k];
+        Frame p = frames[k];
 
         float dist = pointLineDist(p, q1, q2);
         if (dist > maxDist) {
@@ -166,20 +184,66 @@ float maxChordDistBetween(BezHandle *keyframes, int i, int j) { //
     return maxDist;
 }
 
-
-void initTable (int nPtsSq, nStop table[nPtsSq]) { //
+void initTable(int nPtsSq, NStop table[nPtsSq]) { //
 	for (int i = 0; i < nPtsSq; i++) {
 		table[i].cost = 99999;
 		table[i].n = 0;
 	} 
 }
 
+/* Backend API ----------------------------- */
 
-void makeZeroStopTable(int nPts, int nPtsSq, nStop e[nPtsSq], BezHandle *keyframes) { //
+double energy(Frame p, Frame p1, Frame p2) {
+	return (p2.v) - (2 * p1.v) - (p.v);
+}
+
+double roughnessOfCurve(FCurve *fcu) {
+	int i;
+	BezTriple *bezt;
+    
+	double curveValues[fcu->totvert];
+	for (i = 0, bezt = fcu->bezt; i < fcu->totvert; i++, bezt++) {
+		curveValues[i] = bezt->vec[1][1];
+	}
+
+	double roughness = 0;
+	for (int i = 0; i < fcu->totvert - 2; i++) {
+		roughness += fabs(curveValues[i + 2] - 2 * curveValues[i + 1] - curveValues[i]);
+	}
+
+	return roughness;
+}
+
+
+// void setEnergy(AnimCurve * curve) {
+// 	Frame * frames = curve->frames;
+// 	curve->energy = 0;
+
+// 	for (int i = 0; i < curve->numFrames - 2; i++) {
+// 		double e = energy(frames[i], frames[i + 1], frames[i + 2]);
+// 		curve->energy += abs(e);
+// 	}
+// }
+
+// int findRoughestCurve(AnimCurve * curves, int numCurves) {
+// 	double maxEnergy = curves[0].energy;
+// 	int roughestIndex = 0;
+
+// 	for (int i = 1; i < numCurves; i++) {
+// 		if (curves[i].energy > maxEnergy) {
+// 			maxEnergy = curves[i].energy;
+// 			roughestIndex = i;
+// 		}
+// 	}
+
+// 	return roughestIndex;
+// }
+
+void makeZeroStopTable(int nPts, int nPtsSq, NStop e[nPtsSq], Frame * frames) { //
     for (int i = 0; i < nPts - 1; i++) {
         for (int j = i + 1; j < nPts; j++) {
         	int index = i * nPts + j;
-            e[index].cost = maxChordDistBetween(keyframes, i, j);
+            e[index].cost = maxChordDistBetween(frames, i, j);
             e[index].n = 2;
 
             e[index].path = malloc(e[index].n * sizeof(int));  
@@ -190,9 +254,9 @@ void makeZeroStopTable(int nPts, int nPtsSq, nStop e[nPtsSq], BezHandle *keyfram
 }
 
 
-int * makeNStopTable(int nPts, int nPtsSq, int maxN, int n, nStop nTable[nPtsSq], nStop zTable[nPtsSq]) {
+int * iterateStopTable(int nPts, int nPtsSq, int maxN, int n, NStop nTable[nPtsSq], NStop zTable[nPtsSq]) {
     if (n > maxN) {
-    	int *path = malloc(nTable[nPts - 1].n * sizeof (int));
+    	int * path = malloc(nTable[nPts - 1].n * sizeof (int));
     	copyPath(path, nTable[nPts - 1].path, nTable[nPts - 1].n);
 
     	for (int i = 0; i < nPtsSq; i++) {
@@ -203,7 +267,7 @@ int * makeNStopTable(int nPts, int nPtsSq, int maxN, int n, nStop nTable[nPtsSq]
         return path;
     }
 
-    nStop nTableNext[nPtsSq];
+    NStop nTableNext[nPtsSq];
     initTable(nPtsSq, nTableNext);
 
     for (int i = 0; i < nPts; i++) {
@@ -240,7 +304,7 @@ int * makeNStopTable(int nPts, int nPtsSq, int maxN, int n, nStop nTable[nPtsSq]
     }
 
 
-    return makeNStopTable(nPts, nPtsSq, maxN, n + 1, nTableNext, zTable);
+    return iterateStopTable(nPts, nPtsSq, maxN, n + 1, nTableNext, zTable);
 
 }
 
@@ -248,49 +312,36 @@ int * makeNStopTable(int nPts, int nPtsSq, int maxN, int n, nStop nTable[nPtsSq]
 
 
 /* Evaluates the curves between each selected keyframe on each frame, and keys the value  */
-void reduce_fcurve(FCurve *fcu, int count)
+int * getSalientFrames(FCurve *fcu, int count)
 {
     int i;
 	BezTriple *bezt;
-    
-	if (fcu->bezt == NULL) /* ignore baked */
-		return;
 	
 	/* Store keyframe locations in array */
-	BezHandle keyframes[fcu->totvert];
+	Frame frames[fcu->totvert];
 
 	for (i = 0, bezt = fcu->bezt; i < fcu->totvert; i++, bezt++) {
-		BezHandle bzh;
-		bzh.x = bezt->vec[1][0];
-		bzh.y = bezt->vec[1][1];
-		bzh.z = 0;
-		keyframes[i] = bzh;
-
-        printf("keyframes -- ");
-        printf("x:%2.2f, y:%2.2f\n", bzh.x, bzh.y);
+		Frame frame;
+		frame.f = bezt->vec[1][0];
+		frame.v = bezt->vec[1][1];
+		frames[i] = frame;
 	}
-
-
-
-	
-
-
 
 
 	int nPts = fcu->totvert;
 	int nPtsSq = nPts * nPts;
 
-	nStop zTable[nPtsSq];
+	NStop zTable[nPtsSq];
     initTable(nPtsSq, zTable);
-    makeZeroStopTable(nPts, nPtsSq, zTable, keyframes);
+    makeZeroStopTable(nPts, nPtsSq, zTable, frames);
     
-    nStop nTable[nPtsSq];
+    NStop nTable[nPtsSq];
     initTable(nPtsSq, nTable);
     nStopTableCopy(nPtsSq, zTable, nTable);
     
-    int * path = makeNStopTable(nPts, nPtsSq, count - 3, 0, nTable, zTable);
+    int * frameIndicies = iterateStopTable(nPts, nPtsSq, count - 3, 0, nTable, zTable);
     
-
+    
     
     for (int i = 0; i < nPts * nPts; i++) {
    		if (zTable[i].n > 0) {
@@ -298,24 +349,33 @@ void reduce_fcurve(FCurve *fcu, int count)
     	}
     }
 
-
-
-	clear_fcurve_keys(fcu);
-
-	for (int i = 0; i < count; i++) {
-		int frame = keyframes[path[i]].x;
-		float val = keyframes[path[i]].y;
-		insert_vert_fcurve(fcu, frame, val, 1);
-	}
-
-    calchandles_fcurve(fcu);
+    return frameIndicies;
 
 
 
-
-    
+	
 
 }
+
+// void setSalientFrames(FCurve *fcu, int * salientFrames, int count) {
+
+// 	Frame frames[count];
+// 	for (i = 0, bezt = fcu->bezt; i < fcu->totvert; i++, bezt++) {
+// 		Frame frame;
+// 		frame.f = salientFrames[i];
+// 		frame.v = 
+// 	}
+
+// 	clear_fcurve_keys(fcu);
+
+	
+// 		int frame = salientFrames;
+// 		float val = frames[path[i]].v;
+// 		insert_vert_fcurve(fcu, frame, val, 1);
+// 	}
+
+//     calchandles_fcurve(fcu);
+// }
 
 /**
  * Second-tier invoke() callback that performs context validation before running the
@@ -386,7 +446,7 @@ static int ed_reduction_opwrap_invoke_custom(bContext *C, wmOperator *op, const 
 /* Evaluates the curves between each selected keyframe on each frame, and keys the value  */
 static void reduce_fcurve_keys(bAnimContext *ac, int count)
 {	
-	// printf("%s\n", "reduce_fcurve_keys - RICHARD C, begun");
+	printf("%s\n", "reduce_fcurve_keys - RICHARD A, begun");
 	ListBase anim_data = {NULL, NULL};
 	bAnimListElem *ale;
 	int filter;
@@ -395,22 +455,42 @@ static void reduce_fcurve_keys(bAnimContext *ac, int count)
 	filter = (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_CURVE_VISIBLE | ANIMFILTER_FOREDIT | ANIMFILTER_NODUPLIS | ANIMFILTER_SEL);
 	ANIM_animdata_filter(ac, &anim_data, filter, ac->data, ac->datatype);
 	
-	/* loop through filtered data and add keys between selected keyframes on every frame  */
+	/* find the roughest curve  */
+	double maxE = 0; int maxIndex = 0;
+	int i = 0;
 	for (ale = anim_data.first; ale; ale = ale->next) {
-		reduce_fcurve((FCurve *)ale->key_data, count);
-		ale->update |= ANIM_UPDATE_DEPS;
+		double e = roughnessOfCurve((FCurve *)ale->key_data);
+		if (e > maxE) { maxE = e; maxIndex = i; }
+		i++;
+
 	}
 
-	ANIM_animdata_update(ac, &anim_data);
-	ANIM_animdata_freelist(&anim_data);
-	// printf("%s\n", "reduce_fcurve_keys - RICHARD C2, completed");
+	/* pick salient frames */
+	i = 0;
+	int * frameIndicies;
+	for (ale = anim_data.first; ale; ale = ale->next) {
+		if (i == maxIndex) {
+			frameIndicies = getSalientFrames((FCurve *)ale->key_data, count);		
+		}
+		i++;
+	}
+	
+	for (ale = anim_data.first; ale; ale = ale->next) {
+		setKeyframes(int * frameIndicies, count);
+	}
+
+
+	// ale->update |= ANIM_UPDATE_DEPS;
+
+	// ANIM_animdata_update(ac, &anim_data);
+	// ANIM_animdata_freelist(&anim_data);
 }
 
 /* reduce selected fcurves */
 static int ed_reduction_reduce_exec(bContext *C, wmOperator *op)
 {
     printf("EXECUTING REDUCE!!");
-    exit(0);
+    // exit(0);
 	bAnimContext ac;
 
 	/* get editor data */

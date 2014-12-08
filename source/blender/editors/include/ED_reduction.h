@@ -31,12 +31,6 @@
 #ifndef __ED_REDUCTION_H__
 #define __ED_REDUCTION_H__
 
-struct wmKeyConfig;
-struct wmKeyMap;
-struct bContext;
-struct bAnimContext;
-struct Scene;
-
 /* Drawing API ------------------------------ */
 
 
