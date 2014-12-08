@@ -1018,6 +1018,88 @@ void GRAPH_OT_clean(wmOperatorType *ot)
 	ot->prop = RNA_def_float(ot->srna, "threshold", 0.001f, 0.0f, FLT_MAX, "Threshold", "", 0.0f, 1000.0f);
 }
 
+/* ******************** Reduce Keyframes Operator ************************* */
+
+static void reduce_keyframes(bAnimContext *ac, int key_count)
+{   
+    ListBase anim_data = {NULL, NULL};
+    bAnimListElem *ale;
+    int filter;
+    
+    /* filter data */
+    filter = (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_CURVE_VISIBLE | ANIMFILTER_FOREDIT | ANIMFILTER_NODUPLIS | ANIMFILTER_SEL);
+    ANIM_animdata_filter(ac, &anim_data, filter, ac->data, ac->datatype);
+
+    /* Reduce keyframes */
+    int *frameIndicies = ED_reduction_pick_best_frames_fcurves(anim_data, key_count);
+    ED_reduction_reduce_fcurves_to_frames(anim_data, frameIndicies, key_count);
+
+    ANIM_animdata_update(ac, &anim_data);
+    ANIM_animdata_freelist(&anim_data);
+}
+
+/* ------------------- */
+
+static int reduce_keyframes_exec(bContext *C, wmOperator *op)
+{
+    bAnimContext ac;
+    int key_count;
+    
+    /* get editor data */
+    if (ANIM_animdata_get_context(C, &ac) == 0)
+        return OPERATOR_CANCELLED;
+        
+    /* get reduce key count */
+    key_count = RNA_float_get(op->ptr, "KeyCount");
+    
+    /* reduce keyframes */
+    reduce_keyframes(&ac, key_count);
+    
+    /* set notifier that keyframes have changed */
+    WM_event_add_notifier(C, NC_ANIMATION | ND_KEYFRAME | NA_EDITED, NULL);
+    
+    return OPERATOR_FINISHED;
+}
+
+static int reduce_keyframes_invoke_wrapper(bContext *C, wmOperator *op, const wmEvent *event)
+{
+    ScrArea *sa = CTX_wm_area(C);
+    int retval = OPERATOR_PASS_THROUGH;
+    
+    if (WM_operator_props_popup)
+        retval = WM_operator_props_popup(C, op, event);
+    else if (op->type->exec)
+        retval = op->type->exec(C, op);
+    else
+        BKE_report(op->reports, RPT_ERROR, "Programming error: operator does not actually have code to do anything!");
+        
+    if (sa->spacetype != SPACE_TIME) {
+        if ((retval & (OPERATOR_FINISHED | OPERATOR_INTERFACE)) == 0)
+            retval |= OPERATOR_PASS_THROUGH;
+    }
+    
+    return retval;
+}
+
+ 
+void GRAPH_OT_reduce(wmOperatorType *ot)
+{
+    /* identifiers */
+    ot->name = "Reduce Keyframes";
+    ot->idname = "GRAPH_OT_reduce";
+    ot->description = "Reduce the number of keyframes in the selected F-Curves";
+    
+    /* api callbacks */
+    ot->exec = reduce_keyframes_exec;
+    ot->poll = graphop_editable_keyframes_poll;
+    
+    /* flags */
+    ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
+    
+    /* properties */
+    ot->prop = RNA_def_int(ot->srna, "KeyCount", 3, 8, 100, "Number of Keys", "", 3, 100);
+}
+
 /* ******************** Bake F-Curve Operator *********************** */
 /* This operator bakes the data of the selected F-Curves to F-Points */
 

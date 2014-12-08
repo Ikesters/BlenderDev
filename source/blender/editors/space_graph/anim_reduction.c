@@ -166,7 +166,7 @@ void ED_reduction_copy_stoptable_path_and_add(int *tgt, int *src, int npts, int 
 void ED_reduction_init_stoptable(int npts_sq, NStop table[npts_sq])
 {
 	for (int i = 0; i < npts_sq; i++) {
-		table[i].cost = 99999;
+		table[i].cost = INT_MAX;
 		table[i].n = 0;
 	} 
 }
@@ -334,123 +334,7 @@ void ED_reduction_reduce_fcurves_to_frames(ListBase anim_data, int *frameIndicie
 
 	for (ale = anim_data.first; ale; ale = ale->next) {
 		ED_reduction_reduce_fcurve_to_frames((FCurve *)ale->key_data, frameIndicies, n_stops);
+		ale->update |= ANIM_UPDATE_DEFAULT;
 	}
 }
 
-
-
-/* Reduce FCurve Operator ------------------------------------------------------------------------------------------- */
-
-/**
- * Second-tier invoke() callback that performs context validation before running the
- * "custom"/third-tier invoke() callback supplied as the last arg (which would normally
- * be the operator's invoke() callback elsewhere)
- *
- * \param invoke_func "standard" invoke function that operator would otherwise have used.
- * If NULL, the operator's standard exec()
- * callback will be called instead in the appropriate places.
- */
-static int ed_reduction_opwrap_invoke_custom(bContext *C, wmOperator *op, const wmEvent *event,
-											 int (*invoke_func)(bContext *, wmOperator *, const wmEvent *))
-{	
-	
-	ScrArea *sa = CTX_wm_area(C);
-	int retval = OPERATOR_PASS_THROUGH;
-	
-	if (invoke_func)
-		retval = invoke_func(C, op, event);
-	else if (op->type->exec)
-		retval = op->type->exec(C, op);
-	else
-		BKE_report(op->reports, RPT_ERROR, "Programming error: operator does not actually have code to do anything!");
-		
-	if (sa->spacetype != SPACE_TIME) {
-		if ((retval & (OPERATOR_FINISHED | OPERATOR_INTERFACE)) == 0)
-			retval |= OPERATOR_PASS_THROUGH;
-	}
-	
-	return retval;
-}
-
-
-/* ******************** Reduce Operator *********************** */
-/* This operator reduces the number of keyframes used in the selected f-curves. To
- * do this it uses the findSalient function to identify the most important keyframes.
- *
- * Once the findSalient code has complime
- */
-
-/* Evaluates the curves between each selected keyframe on each frame, and keys the value  */
-static void reduce_fcurve_keys(bAnimContext *ac, int n_keyframes)
-{	
-	ListBase anim_data = {NULL, NULL};
-	bAnimListElem *ale;
-	int filter;
-	
-	/* filter data */
-	filter = (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_CURVE_VISIBLE | ANIMFILTER_FOREDIT | ANIMFILTER_NODUPLIS | ANIMFILTER_SEL);
-	ANIM_animdata_filter(ac, &anim_data, filter, ac->data, ac->datatype);
-
-	/* pick best salient points, then reduce each curve */
-	int *frameIndicies = ED_reduction_pick_best_frames_fcurves(anim_data, n_keyframes);
-	ED_reduction_reduce_fcurves_to_frames(anim_data, frameIndicies, n_keyframes);
-
-	// ale->update |= ANIM_UPDATE_DEPS; ???
-	ANIM_animdata_update(ac, &anim_data);
-	ANIM_animdata_freelist(&anim_data);
-}
-
-/* reduce selected fcurves */
-static int ed_reduction_reduce_exec(bContext *C, wmOperator *op)
-{
-	bAnimContext ac;
-
-	/* get editor data */
-	if (ANIM_animdata_get_context(C, &ac) == 0) {
-		return OPERATOR_CANCELLED;
-	}
-	
-	/* run reduction function */
-	int keyCount = RNA_int_get(op->ptr, "KeyCount");
-	reduce_fcurve_keys(&ac, keyCount);
-	
-	/* set notifier that keyframes have changed */
-	WM_event_add_notifier(C, NC_ANIMATION | ND_KEYFRAME | NA_EDITED, NULL);
-	
-	return OPERATOR_FINISHED;
-}
-
-static int ed_reduction_reduce_invoke_wrapper(bContext *C, wmOperator *op, const wmEvent *event)
-{
-	/* now see if the operator is usable */
-	return ed_reduction_opwrap_invoke_custom(C, op, event, WM_operator_props_popup);
-}
-
-
-
-static void REDUCTION_OT_reduce(wmOperatorType *ot)
-{
-	/* identifiers */
-	ot->name = "Reduce F-curve";
-	ot->description = "Reduce the number of keyframes in the active f-curve";
-	ot->idname = "REDUCTION_OT_reduce";
-	
-	/* api callbacks */
-	ot->invoke = ed_reduction_reduce_invoke_wrapper;
-	ot->exec = ed_reduction_reduce_exec;
-	ot->poll = graphop_editable_keyframes_poll;
-	
-	/* flags */
-	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
-	
-	/* properties */
-	ot->prop = RNA_def_int(ot->srna, "KeyCount", 3, 3, 100, "Number of Keys", "How many keyframes to reduce to.", 3, 100);
-}
-
-
-/* Registration ----------------------------------------------------------------------------------------------------- */
-
-void ED_operatortypes_reduction(void)
-{
-	WM_operatortype_append(REDUCTION_OT_reduce);
-}
