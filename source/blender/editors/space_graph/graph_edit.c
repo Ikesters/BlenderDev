@@ -85,7 +85,7 @@
 /* Get the min/max keyframes*/
 /* note: it should return total boundbox, filter for selection only can be argument... */
 void get_graph_keyframe_extents(bAnimContext *ac, float *xmin, float *xmax, float *ymin, float *ymax, 
-						const bool do_sel_only, const bool include_handles)
+				const bool do_sel_only, const bool include_handles)
 {
 	Scene *scene = ac->scene;
 	
