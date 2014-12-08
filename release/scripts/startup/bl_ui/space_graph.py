@@ -232,11 +232,11 @@ class GRAPH_MT_key(Menu):
         layout.operator_menu_enum("graph.easing_type", "type", text="Easing Type")
 
         layout.separator()
+        layout.operator("graph.reduce")
         layout.operator("graph.clean")
         layout.operator("graph.smooth")
         layout.operator("graph.sample")
         layout.operator("graph.bake")
-        layout.operator("graph.reduce")
 
         layout.separator()
         layout.operator("graph.copy")
