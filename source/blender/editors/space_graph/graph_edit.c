@@ -85,7 +85,7 @@
 /* Get the min/max keyframes*/
 /* note: it should return total boundbox, filter for selection only can be argument... */
 void get_graph_keyframe_extents(bAnimContext *ac, float *xmin, float *xmax, float *ymin, float *ymax, 
-				 const bool do_sel_only, const bool include_handles)
+                                const bool do_sel_only, const bool include_handles)
 {
 	Scene *scene = ac->scene;
 	
@@ -217,7 +217,7 @@ void GRAPH_OT_previewrange_set(wmOperatorType *ot)
 /* ****************** View-All Operator ****************** */
 
 static int graphkeys_viewall(bContext *C, const bool do_sel_only, const bool include_handles,
-							 const int smooth_viewtx)
+                             const int smooth_viewtx)
 {
 	bAnimContext ac;
 	rctf cur_new;
@@ -228,9 +228,9 @@ static int graphkeys_viewall(bContext *C, const bool do_sel_only, const bool inc
 	
 	/* set the horizontal range, with an extra offset so that the extreme keys will be in view */
 	get_graph_keyframe_extents(&ac,
-							   &cur_new.xmin, &cur_new.xmax,
-							   &cur_new.ymin, &cur_new.ymax,
-							   do_sel_only, include_handles);
+	                           &cur_new.xmin, &cur_new.xmax,
+	                           &cur_new.ymin, &cur_new.ymax,
+	                           do_sel_only, include_handles);
 
 	BLI_rctf_scale(&cur_new, 1.1f);
 	
@@ -275,7 +275,7 @@ void GRAPH_OT_view_all(wmOperatorType *ot)
 	
 	/* props */
 	ot->prop = RNA_def_boolean(ot->srna, "include_handles", true, "Include Handles", 
-							   "Include handles of keyframes when calculating extents");
+	                           "Include handles of keyframes when calculating extents");
 }
 
 void GRAPH_OT_view_selected(wmOperatorType *ot)
@@ -294,7 +294,7 @@ void GRAPH_OT_view_selected(wmOperatorType *ot)
 	
 	/* props */
 	ot->prop = RNA_def_boolean(ot->srna, "include_handles", true, "Include Handles", 
-							   "Include handles of keyframes when calculating extents");
+	                           "Include handles of keyframes when calculating extents");
 }
 
 /* ******************** Create Ghost-Curves Operator *********************** */
@@ -304,7 +304,7 @@ void GRAPH_OT_view_selected(wmOperatorType *ot)
 
 /* Bake each F-Curve into a set of samples, and store as a ghost curve */
 static void create_ghost_curves(bAnimContext *ac, int start, int end)
-{   
+{	
 	SpaceIpo *sipo = (SpaceIpo *)ac->sl;
 	ListBase anim_data = {NULL, NULL};
 	bAnimListElem *ale;
@@ -342,7 +342,7 @@ static void create_ghost_curves(bAnimContext *ac, int start, int end)
 		unitFac = ANIM_unit_mapping_get_factor(ac->scene, ale->id, fcu, mapping_flag);
 		
 		/* create samples, but store them in a new curve 
-		 *  - we cannot use fcurve_store_samples() as that will only overwrite the original curve 
+		 *	- we cannot use fcurve_store_samples() as that will only overwrite the original curve 
 		 */
 		gcu->fpt = fpt = MEM_callocN(sizeof(FPoint) * (end - start + 1), "Ghost FPoint Samples");
 		gcu->totvert = end - start + 1;
@@ -356,7 +356,7 @@ static void create_ghost_curves(bAnimContext *ac, int start, int end)
 		}
 		
 		/* set color of ghost curve 
-		 *  - make the color slightly darker
+		 *	- make the color slightly darker
 		 */
 		gcu->color[0] = fcu->color[0] - 0.07f;
 		gcu->color[1] = fcu->color[1] - 0.07f;
@@ -679,7 +679,7 @@ void GRAPH_OT_click_insert(wmOperatorType *ot)
 /* NOTE: the backend code for this is shared with the dopesheet editor */
 
 static short copy_graph_keys(bAnimContext *ac)
-{   
+{	
 	ListBase anim_data = {NULL, NULL};
 	int filter, ok = 0;
 	
@@ -700,8 +700,8 @@ static short copy_graph_keys(bAnimContext *ac)
 }
 
 static short paste_graph_keys(bAnimContext *ac,
-							  const eKeyPasteOffset offset_mode, const eKeyMergeMode merge_mode)
-{   
+                              const eKeyPasteOffset offset_mode, const eKeyMergeMode merge_mode)
+{	
 	ListBase anim_data = {NULL, NULL};
 	int filter, ok = 0;
 	
@@ -795,7 +795,7 @@ void GRAPH_OT_paste(wmOperatorType *ot)
 	ot->description = "Paste keyframes from copy/paste buffer for the selected channels, starting on the current frame";
 	
 	/* api callbacks */
-//  ot->invoke = WM_operator_props_popup; // better wait for graph redo panel
+//	ot->invoke = WM_operator_props_popup; // better wait for graph redo panel
 	ot->exec = graphkeys_paste_exec;
 	ot->poll = graphop_editable_keyframes_poll;
 	
@@ -904,8 +904,8 @@ static bool delete_graph_keys(bAnimContext *ac)
 		
 		/* Only delete curve too if it won't be doing anything anymore */
 		if ((fcu->totvert == 0) &&
-			(list_has_suitable_fmodifier(&fcu->modifiers, 0, FMI_TYPE_GENERATE_CURVE) == 0) &&
-			(fcu->driver == NULL))
+		    (list_has_suitable_fmodifier(&fcu->modifiers, 0, FMI_TYPE_GENERATE_CURVE) == 0) &&
+		    (fcu->driver == NULL))
 		{
 			ANIM_fcurve_delete_from_animdata(ac, adt, fcu);
 			ale->key_data = NULL;
@@ -957,7 +957,7 @@ void GRAPH_OT_delete(wmOperatorType *ot)
 /* ******************** Clean Keyframes Operator ************************* */
 
 static void clean_graph_keys(bAnimContext *ac, float thresh)
-{   
+{	
 	ListBase anim_data = {NULL, NULL};
 	bAnimListElem *ale;
 	int filter;
@@ -1107,7 +1107,7 @@ void GRAPH_OT_reduce(wmOperatorType *ot)
 
 /* Bake each F-Curve into a set of samples */
 static void bake_graph_curves(bAnimContext *ac, int start, int end)
-{   
+{	
 	ListBase anim_data = {NULL, NULL};
 	bAnimListElem *ale;
 	int filter;
@@ -1240,16 +1240,16 @@ static int graphkeys_sound_bake_exec(bContext *C, wmOperator *op)
 
 	/* store necessary data for the baking steps */
 	sbi.samples = AUD_readSoundBuffer(path,
-									  RNA_float_get(op->ptr, "low"),
-									  RNA_float_get(op->ptr, "high"),
-									  RNA_float_get(op->ptr, "attack"),
-									  RNA_float_get(op->ptr, "release"),
-									  RNA_float_get(op->ptr, "threshold"),
-									  RNA_boolean_get(op->ptr, "use_accumulate"),
-									  RNA_boolean_get(op->ptr, "use_additive"),
-									  RNA_boolean_get(op->ptr, "use_square"),
-									  RNA_float_get(op->ptr, "sthreshold"),
-									  FPS, &sbi.length);
+	                                  RNA_float_get(op->ptr, "low"),
+	                                  RNA_float_get(op->ptr, "high"),
+	                                  RNA_float_get(op->ptr, "attack"),
+	                                  RNA_float_get(op->ptr, "release"),
+	                                  RNA_float_get(op->ptr, "threshold"),
+	                                  RNA_boolean_get(op->ptr, "use_accumulate"),
+	                                  RNA_boolean_get(op->ptr, "use_additive"),
+	                                  RNA_boolean_get(op->ptr, "use_square"),
+	                                  RNA_float_get(op->ptr, "sthreshold"),
+	                                  FPS, &sbi.length);
 
 	if (sbi.samples == NULL) {
 		BKE_report(op->reports, RPT_ERROR, "Unsupported audio format");
@@ -1326,28 +1326,28 @@ void GRAPH_OT_sound_bake(wmOperatorType *ot)
 
 	/* properties */
 	WM_operator_properties_filesel(ot, FOLDERFILE | SOUNDFILE | MOVIEFILE, FILE_SPECIAL, FILE_OPENFILE,
-								   WM_FILESEL_FILEPATH, FILE_DEFAULTDISPLAY);
+	                               WM_FILESEL_FILEPATH, FILE_DEFAULTDISPLAY);
 	RNA_def_float(ot->srna, "low", 0.0f, 0.0, 100000.0, "Lowest frequency",
-				  "Cutoff frequency of a high-pass filter that is applied to the audio data", 0.1, 1000.00);
+	              "Cutoff frequency of a high-pass filter that is applied to the audio data", 0.1, 1000.00);
 	RNA_def_float(ot->srna, "high", 100000.0, 0.0, 100000.0, "Highest frequency",
-				  "Cutoff frequency of a low-pass filter that is applied to the audio data", 0.1, 1000.00);
+	              "Cutoff frequency of a low-pass filter that is applied to the audio data", 0.1, 1000.00);
 	RNA_def_float(ot->srna, "attack", 0.005, 0.0, 2.0, "Attack time",
-				  "Value for the hull curve calculation that tells how fast the hull curve can rise "
-				  "(the lower the value the steeper it can rise)", 0.01, 0.1);
+	              "Value for the hull curve calculation that tells how fast the hull curve can rise "
+	              "(the lower the value the steeper it can rise)", 0.01, 0.1);
 	RNA_def_float(ot->srna, "release", 0.2, 0.0, 5.0, "Release time",
-				  "Value for the hull curve calculation that tells how fast the hull curve can fall "
-				  "(the lower the value the steeper it can fall)", 0.01, 0.2);
+	              "Value for the hull curve calculation that tells how fast the hull curve can fall "
+	              "(the lower the value the steeper it can fall)", 0.01, 0.2);
 	RNA_def_float(ot->srna, "threshold", 0.0, 0.0, 1.0, "Threshold",
-				  "Minimum amplitude value needed to influence the hull curve", 0.01, 0.1);
+	              "Minimum amplitude value needed to influence the hull curve", 0.01, 0.1);
 	RNA_def_boolean(ot->srna, "use_accumulate", 0, "Accumulate",
-					"Only the positive differences of the hull curve amplitudes are summarized to produce the output");
+	                "Only the positive differences of the hull curve amplitudes are summarized to produce the output");
 	RNA_def_boolean(ot->srna, "use_additive", 0, "Additive",
-					"The amplitudes of the hull curve are summarized (or, when Accumulate is enabled, "
-					"both positive and negative differences are accumulated)");
+	                "The amplitudes of the hull curve are summarized (or, when Accumulate is enabled, "
+	                "both positive and negative differences are accumulated)");
 	RNA_def_boolean(ot->srna, "use_square", 0, "Square",
-					"The output is a square curve (negative values always result in -1, and positive ones in 1)");
+	                "The output is a square curve (negative values always result in -1, and positive ones in 1)");
 	RNA_def_float(ot->srna, "sthreshold", 0.1, 0.0, 1.0, "Square Threshold",
-				  "Square only: all values with an absolute amplitude lower than that result in 0", 0.01, 0.1);
+	              "Square only: all values with an absolute amplitude lower than that result in 0", 0.01, 0.1);
 }
 
 /* ******************** Sample Keyframes Operator *********************** */
@@ -1357,7 +1357,7 @@ void GRAPH_OT_sound_bake(wmOperatorType *ot)
 
 /* Evaluates the curves between each selected keyframe on each frame, and keys the value  */
 static void sample_graph_keys(bAnimContext *ac)
-{   
+{	
 	ListBase anim_data = {NULL, NULL};
 	bAnimListElem *ale;
 	int filter;
@@ -1773,8 +1773,8 @@ static int graphkeys_euler_filter_exec(bContext *C, wmOperator *op)
 		
 	/* The process is done in two passes:
 	 *   1) Sets of three related rotation curves are identified from the selected channels,
-	 *      and are stored as a single 'operation unit' for the next step
-	 *   2) Each set of three F-Curves is processed for each keyframe, with the values being
+	 *		and are stored as a single 'operation unit' for the next step
+	 *	 2) Each set of three F-Curves is processed for each keyframe, with the values being
 	 *      processed as necessary
 	 */
 	 
@@ -1786,15 +1786,15 @@ static int graphkeys_euler_filter_exec(bContext *C, wmOperator *op)
 		FCurve *fcu = (FCurve *)ale->data;
 		
 		/* check if this is an appropriate F-Curve 
-		 *  - only rotation curves
-		 *  - for pchan curves, make sure we're only using the euler curves
+		 *	- only rotation curves
+		 *	- for pchan curves, make sure we're only using the euler curves
 		 */
 		if (strstr(fcu->rna_path, "rotation_euler") == NULL)
 			continue;
 		else if (ELEM(fcu->array_index, 0, 1, 2) == 0) {
 			BKE_reportf(op->reports, RPT_WARNING,
-						"Euler Rotation F-Curve has invalid index (ID='%s', Path='%s', Index=%d)",
-						(ale->id) ? ale->id->name : TIP_("<No ID>"), fcu->rna_path, fcu->array_index);
+			            "Euler Rotation F-Curve has invalid index (ID='%s', Path='%s', Index=%d)",
+			            (ale->id) ? ale->id->name : TIP_("<No ID>"), fcu->rna_path, fcu->array_index);
 			continue;
 		}
 		
@@ -1827,7 +1827,7 @@ static int graphkeys_euler_filter_exec(bContext *C, wmOperator *op)
 	}
 	
 	/* step 2: go through each set of curves, processing the values at each keyframe 
-	 *  - it is assumed that there must be a full set of keyframes at each keyframe position
+	 *	- it is assumed that there must be a full set of keyframes at each keyframe position
 	 */
 	for (euf = eulers.first; euf; euf = euf->next) {
 		int f;
@@ -1837,11 +1837,11 @@ static int graphkeys_euler_filter_exec(bContext *C, wmOperator *op)
 		if (ELEM(NULL, euf->fcurves[0], euf->fcurves[1], euf->fcurves[2])) {
 			/* report which components are missing */
 			BKE_reportf(op->reports, RPT_WARNING,
-						"Missing %s%s%s component(s) of euler rotation for ID='%s' and RNA-Path='%s'",
-						(euf->fcurves[0] == NULL) ? "X" : "",
-						(euf->fcurves[1] == NULL) ? "Y" : "",
-						(euf->fcurves[2] == NULL) ? "Z" : "",
-						euf->id->name, euf->rna_path);
+			            "Missing %s%s%s component(s) of euler rotation for ID='%s' and RNA-Path='%s'",
+			            (euf->fcurves[0] == NULL) ? "X" : "",
+			            (euf->fcurves[1] == NULL) ? "Y" : "",
+			            (euf->fcurves[2] == NULL) ? "Z" : "",
+			            euf->id->name, euf->rna_path);
 				
 			/* keep track of number of failed sets, and carry on to next group */
 			failed++;
@@ -1886,16 +1886,16 @@ static int graphkeys_euler_filter_exec(bContext *C, wmOperator *op)
 	/* updates + finishing warnings */
 	if (failed == groups) {
 		BKE_report(op->reports, RPT_ERROR, 
-				   "No Euler Rotations could be corrected, ensure each rotation has keys for all components, "
-				   "and that F-Curves for these are in consecutive XYZ order and selected");
+		           "No Euler Rotations could be corrected, ensure each rotation has keys for all components, "
+		           "and that F-Curves for these are in consecutive XYZ order and selected");
 		return OPERATOR_CANCELLED;
 	}
 	else {
 		if (failed) {
 			BKE_report(op->reports, RPT_ERROR,
-					   "Some Euler Rotations could not be corrected due to missing/unselected/out-of-order F-Curves, "
-					   "ensure each rotation has keys for all components, and that F-Curves for these are in "
-					   "consecutive XYZ order and selected");
+			           "Some Euler Rotations could not be corrected due to missing/unselected/out-of-order F-Curves, "
+			           "ensure each rotation has keys for all components, and that F-Curves for these are in "
+			           "consecutive XYZ order and selected");
 		}
 		
 		/* set notifier that keyframes have changed */
@@ -1912,8 +1912,8 @@ void GRAPH_OT_euler_filter(wmOperatorType *ot)
 	ot->name = "Euler Discontinuity Filter";
 	ot->idname = "GRAPH_OT_euler_filter";
 	ot->description = "Fix large jumps and flips in the selected "
-					  "Euler Rotation F-Curves arising from rotation "
-					  "values being clipped when baking physics";
+	                  "Euler Rotation F-Curves arising from rotation "
+	                  "values being clipped when baking physics";
 	
 	/* api callbacks */
 	ot->exec = graphkeys_euler_filter_exec;
