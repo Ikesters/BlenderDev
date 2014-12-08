@@ -1031,8 +1031,6 @@ static void reduce_keyframes(bAnimContext *ac, int key_count)
 	ANIM_animdata_filter(ac, &anim_data, filter, ac->data, ac->datatype);
 
 	/* Reduce keyframes */
-
-	printf("KEYCOUNT HERE %d\n", key_count);
 	int *frameIndicies = ED_reduction_pick_best_frames_fcurves(anim_data, key_count);
 	ED_reduction_reduce_fcurves_to_frames(anim_data, frameIndicies, key_count);
 
@@ -1099,7 +1097,7 @@ void GRAPH_OT_reduce(wmOperatorType *ot)
 	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 	
 	/* properties */
-	ot->prop = RNA_def_int(ot->srna, "KeyCount", 3, 8, 100, "Number of Keys", "", 3, 100);
+	ot->prop = RNA_def_int(ot->srna, "KeyCount", 8, 3, 100, "Number of Keys", "", 3, 100);
 }
 
 /* ******************** Bake F-Curve Operator *********************** */

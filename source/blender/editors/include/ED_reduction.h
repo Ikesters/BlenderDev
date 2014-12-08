@@ -59,10 +59,18 @@ void ED_reduction_copy_stoptable_path_and_add(int *tgt, int *src, int npts, int 
 void ED_reduction_init_stoptable(int npts_sq, struct NStop *table);
 void ED_reduction_copy_stoptable(int npts_sq, struct NStop *a, struct NStop *b);
 void ED_reduction_delete_stoptable(int npts_sq, struct NStop *table);
-
 void ED_reduction_zero_stoptable(int nPts, int npts_sq, struct NStop * table, struct Frame *frames);
 void ED_reduction_n_stoptable(int npts, int npts_sq, int n_stops, int n, struct NStop *nTable, struct NStop *zTable);
 
+
+/* Interpolation Analysis ------------------------------------------------------------------------------------------- */
+
+struct Anchor;
+
+double ED_reduction_interpolation_at(double f, double start_f, double end_f, struct Anchor anchors);
+double ED_reduction_interpolation_cost(struct Frame *original_frames, double start_f, double end_f, struct Anchor anchors);
+struct Anchor ED_reduction_pick_anchor_for_segment(struct Frame *original_frames, double start_f, double end_f);
+struct Anchor *ED_reduction_pick_anchors_for_fcurve(struct Frame *original_frames, struct Frame *reduced_frames, int n_frames);
 
 /* Reduction ---------------------------------------------------------------- */
 

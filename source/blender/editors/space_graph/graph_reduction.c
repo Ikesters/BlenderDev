@@ -128,12 +128,12 @@ double ED_reduction_choord_to_frame_cost(Frame p, Frame q1, Frame q2)
 	else { return numer / denom; }
 }
 
-double ED_reduction_path_cost(Frame *frames, int startF, int endF)
+double ED_reduction_path_cost(Frame *frames, int start_f, int end_f)
 {
 	double maxDist = 0;
 
-	for (int i = startF; i < endF; i++) {
-		double dist = ED_reduction_choord_to_frame_cost(frames[i], frames[startF], frames[endF]);
+	for (int i = start_f; i < end_f; i++) {
+		double dist = ED_reduction_choord_to_frame_cost(frames[i], frames[start_f], frames[end_f]);
 		
 		if (dist > maxDist)
 			maxDist = dist;
@@ -232,7 +232,9 @@ void ED_reduction_n_stoptable(int npts, int npts_sq, int n_stops, int n, NStop n
 					tmp_table[indexIJ].cost = cost;
 					tmp_table[indexIJ].n = nTable[indexIK].n + 1;
 					tmp_table[indexIJ].path = malloc(tmp_table[indexIJ].n * sizeof(int));  
-					ED_reduction_copy_stoptable_path_and_add(tmp_table[indexIJ].path, nTable[indexIK].path, nTable[indexIK].n, j);
+					ED_reduction_copy_stoptable_path_and_add(tmp_table[indexIJ].path,
+															 nTable[indexIK].path,
+															 nTable[indexIK].n, j);
 				}
 			}
 		}
@@ -242,6 +244,87 @@ void ED_reduction_n_stoptable(int npts, int npts_sq, int n_stops, int n, NStop n
 	ED_reduction_copy_stoptable(npts_sq, tmp_table, nTable);
 	ED_reduction_n_stoptable(npts, npts_sq, n_stops, n + 1, nTable, zTable);
 }
+
+/* Interpolation Analysis ------------------------------------------------------------------------------------------- */
+
+typedef struct Anchor {
+	double p1;
+	double p2;
+} Anchor;
+
+double ED_reduction_interpolation_at(double f, double start_f, double end_f, Anchor anchors)
+{
+	double numer = f - start_f;
+	double denom = end_f - start_f;
+	double t = denom != 0.0 ? numer / denom : numer;
+
+	return                 pow(1 - t, 3) * start_f     + 
+	       3 *     t     * pow(1 - t, 2) * anchors.p1 +
+           3 * pow(t, 2) *    (1 - t   ) * anchors.p2 +
+               pow(t ,3)                 * end_f;
+}
+
+double ED_reduction_interpolation_cost(Frame *original_frames, double start_f, double end_f, Anchor anchors) {
+	double maxCost = 0;
+
+	int index = 0;
+	for (double i = start_f; i < end_f; i += 1.0) {
+		double originalV = original_frames[index].v;
+		double interpedV = ED_reduction_interpolation_at(i, start_f, end_f, anchors);
+
+		double cost = fabs(originalV - interpedV);
+		if (cost > maxCost)
+			maxCost = cost;
+
+		index ++;
+	}
+
+	return maxCost;
+}
+
+Anchor ED_reduction_pick_anchor_for_segment(Frame *original_frames, double start_f, double end_f) {
+	double h_segment_length = (end_f - start_f) / 2.0;
+	double inc = h_segment_length / 20.0;
+
+	double minCost = 99999.0;
+	double bestI = 0.0;
+	double bestJ = 0.0;
+
+	for (double i = -h_segment_length; i < h_segment_length; i += inc) {
+		for (double j = -h_segment_length; j < h_segment_length; j += inc) {
+
+			double cost = ED_reduction_interpolation_cost(original_frames, start_f, end_f, (Anchor) { i, j });
+			if (cost < minCost) {
+				minCost = cost;
+				bestI = i;
+				bestJ = j;
+			}
+		}
+	}
+
+	return (Anchor) { bestI, bestJ };
+}
+
+Anchor *ED_reduction_pick_anchors_for_fcurve(Frame *original_frames, Frame *reduced_frames, int n_reduced) {
+	Anchor anchors[n_reduced];
+
+	int i;
+	for (i = 0; i < n_reduced; i++)
+		anchors[i] = (Anchor) { 0.0, 0.0 };
+
+	for (i = 1; i < n_reduced; i++) {
+		double start_f = reduced_frames[i - 1].f;
+		double end_f = reduced_frames[i].f;
+
+		Anchor anchor = ED_reduction_pick_anchor_for_segment(original_frames, start_f, end_f);
+		anchors[i - 1].p2 = anchor.p1;
+		anchors[i    ].p1 = anchor.p2;
+	}
+
+	return anchors;
+}
+
+
 
 /* Reduction API ---------------------------------------------------------------------------------------------------- */
 
@@ -308,24 +391,42 @@ int *ED_reduction_pick_best_frames_fcurves(ListBase anim_data, int n_stops)
 
 void ED_reduction_reduce_fcurve_to_frames(FCurve *fcu, int *frameIndicies, int n_stops)
 {
+	int n_frames = fcu->totvert;
 	int i;
 	BezTriple *bezt;
 
 	/* Cache data for each frame in given indicies */
-	Frame frames[n_stops];
+	Frame original_frames[n_frames];
+	Frame reduced_frames[n_stops];
+	Anchor *anchors;
+	
+
 	int index = 0;
-	for (i = 0, bezt = fcu->bezt; i < fcu->totvert; i++, bezt++) {
+	for (i = 0, bezt = fcu->bezt; i < n_frames; i++, bezt++) {
+		original_frames[i] = (Frame) { bezt->vec[1][0], bezt->vec[1][1] };
+
 		if (ED_reduction_is_in_array(i, frameIndicies, n_stops)) {
-			frames[index] = (Frame) { bezt->vec[1][0], bezt->vec[1][1] };
+			reduced_frames[index] = (Frame) { bezt->vec[1][0], bezt->vec[1][1] };
+
 			index ++;
 		}
 	}
 
+	anchors = ED_reduction_pick_anchors_for_fcurve(original_frames, reduced_frames, n_stops);
+
 	/* Delete all keys, and then rebuild curves using cache */
 	clear_fcurve_keys(fcu);
 	for (i = 0; i < n_stops; i++)
-		insert_vert_fcurve(fcu, frames[i].f, frames[i].v, 1);
+		insert_vert_fcurve(fcu, reduced_frames[i].f, reduced_frames[i].v, 1);
 	calchandles_fcurve(fcu);
+
+	for (i = 0, bezt = fcu->bezt; i < fcu->totvert; i++, bezt++) {
+		if (i != 0)
+			bezt->vec[0][1] = anchors[i].p1;
+		if (i != n_stops - 1)
+			bezt->vec[2][1] = anchors[i].p2;
+			
+	}
 }
 
 void ED_reduction_reduce_fcurves_to_frames(ListBase anim_data, int *frameIndicies, int n_stops)
