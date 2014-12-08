@@ -45,9 +45,11 @@ double ED_reduction_get_fcurve_roughness(struct FCurve *fcu);
 /* Keyframe Placement Analysis ---------------------------------------------- */
 
 struct Frame;
+typedef double ** NCurve;
 
-double ED_reduction_choord_to_frame_cost(struct Frame p, struct Frame q1, struct Frame q2);
-double ED_reduction_path_cost(struct Frame *frames, int i, int j);
+void subtract_ncurve(int npts, double *out, double *a, double *b);
+double ED_reduction_choord_to_frame_cost(double *p, double *q1, double *q2, int npts);
+double ED_reduction_path_cost(NCurve ncurve, int start_f, int end_f, int n_curves);
 
 
 /* NStop Tables ------------------------------------------------------------- */
@@ -59,7 +61,7 @@ void ED_reduction_copy_stoptable_path_and_add(int *tgt, int *src, int npts, int 
 void ED_reduction_init_stoptable(int npts_sq, struct NStop *table);
 void ED_reduction_copy_stoptable(int npts_sq, struct NStop *a, struct NStop *b);
 void ED_reduction_delete_stoptable(int npts_sq, struct NStop *table);
-void ED_reduction_zero_stoptable(int nPts, int npts_sq, struct NStop * table, struct Frame *frames);
+void ED_reduction_zero_stoptable(int npts, int npts_sq, struct NStop *table, NCurve ncurve, int n_curves);
 void ED_reduction_n_stoptable(int npts, int npts_sq, int n_stops, int n, struct NStop *nTable, struct NStop *zTable);
 
 
@@ -70,14 +72,16 @@ struct Anchor;
 double ED_reduction_interpolation_at(double f, double start_f, double end_f, struct Anchor anchors);
 double ED_reduction_interpolation_cost(struct Frame *original_frames, double start_f, double end_f, struct Anchor anchors);
 struct Anchor ED_reduction_pick_anchor_for_segment(struct Frame *original_frames, double start_f, double end_f);
-struct Anchor *ED_reduction_pick_anchors_for_fcurve(struct Frame *original_frames, struct Frame *reduced_frames, int n_frames);
+void ED_reduction_pick_anchors_for_fcurve(struct Anchor *anchors, struct Frame *original_frames, struct Frame *reduced_frames, int n_reduced);
+
 
 /* Reduction ---------------------------------------------------------------- */
 
-int *ED_reduction_pick_best_frames_fcurve(struct FCurve *fcu, int n_stops);
+int *ED_reduction_pick_best_frames_fcurve(ListBase anim_data, int n_stops);
 int *ED_reduction_pick_best_frames_fcurves(ListBase anim_data, int n_stops);
 void ED_reduction_reduce_fcurve_to_frames(struct FCurve *fcu, int *frameIndicies, int n_stops);
 void ED_reduction_reduce_fcurves_to_frames(ListBase anim_data, int *frameIndicies, int n_stops);
+
 
 /* Registration, called in screen_ops.c:ED_operatortypes_screen() */
 void ED_operatortypes_reduction(void); 
