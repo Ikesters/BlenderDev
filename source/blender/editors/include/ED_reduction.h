@@ -136,8 +136,8 @@ typedef struct Anchor {
 } Anchor;
 
 double ED_reduction_interpolation_at        (double f, double start_f, double end_f, Anchor anchors);
-double ED_reduction_interpolation_cost      (Frame *original_frames, double start_f, double end_f, Anchor anchors);
-Anchor ED_reduction_pick_anchor_for_segment (Frame *original_frames, double start_f, double end_f);
+double ED_reduction_interpolation_cost      (Frame *org_frames, double start_f, double end_f, Anchor anchors);
+Anchor ED_reduction_pick_anchor_for_segment (Frame *org_frames, double start_f, double end_f);
 void   ED_reduction_tweak_fcurve_anchors    (Anchor *anchors, Frame *org_frames, Frame *reduced_frames, int n_reduced);
 
 
