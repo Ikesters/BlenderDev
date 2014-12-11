@@ -221,7 +221,30 @@ double ED_reduction_segment_cost(NCurve ncurve, int start_f, int end_f, int n_cu
 	return maxDist;
 }
 
-/* NStop Tables ------------------------------------------------------------------------------------------------------ */
+/* Reduction Algorithm ---------------------------------------------------------------------------------------------- */
+/* 
+ * A dynamic programming algorithm is used to try all possible placements of the desired number of keyframes. An 
+ * n-dimensional curve is given, which is "learned" by the algorithm. This learning establishes two 
+ * stoptables. The best placement of the keyframes can be read directly from the finished tables.
+ *
+ * A stoptable is the name we have given to the dynamic programming tables used by this algoirthm. Each cell of a 
+ * stoptable represents the best path between two points, where the starting point is denoted by the row number, and the 
+ * finishing point the column number. Here the word "point" is used to denote a component of the n-dimensional curve (an 
+ * n-dimensional point). A "stop" is a point that is placed between the start and finish points. The end goal of the 
+ * algorithm is to find the best n-2 stops between the start and finish frames of the motion curve (-2 because the start
+ * and finish points are already given).
+ *
+ * The first table the algorithm computes is called the zero-stoptable (z_table). Here the zero indicates that each
+ * cell will feature the best zero stop path between the two points. The other table created is called the n-table,
+ * where "n" suggests that each cell features the best n stop path between the two points. The n-table is created by 
+ * duplicated the z-table first, and then is recursively updated. Note that the first time it is updated, the n-table
+ * will describe the best 1-stop path between each pair of points, or the best three keyframes that start and finish on
+ * that pair of points. The second update will describe the best 2-stop path (2 keyframes between), third update 
+ * 3-stop path (3 between), and so on.
+ *
+ * The algorithm finishes when n-2 updates have been completed, at which time the best placements of n keyframes can be 
+ * read straight from the n-table.
+ */
 
 void ED_reduction_copy_stoptable_path(int *tgt, int *src, int npts)
 {
@@ -280,9 +303,9 @@ void ED_reduction_zero_stoptable(int npts, int npts_sq, NStop table[npts_sq], NC
 	}
 }
 
-void ED_reduction_n_stoptable(int npts, int npts_sq, int n_stops, int n, NStop nTable[npts_sq], NStop zTable[npts_sq])
+void ED_reduction_n_stoptable(int npts, int npts_sq, int n_stops, int n, NStop n_table[npts_sq], NStop z_table[npts_sq])
 {
-	if (nTable[npts - 1].n == n_stops)
+	if (n_table[npts - 1].n == n_stops)
 		return;
 
 	NStop tmp_table[npts_sq];
@@ -292,33 +315,41 @@ void ED_reduction_n_stoptable(int npts, int npts_sq, int n_stops, int n, NStop n
 		for (int j = i + n + 1; j < npts; j++) {
 			int indexIJ = i * npts + j;
 
-			// Find the least cost path between i and j
+			/* Find the least cost path between i and j */
 			float minCost = 99999;
 			for (int k = i + 1; k < j; k++) {
 				int indexIK = i * npts + k;
 				int indexKJ = k * npts + j;
-				float cost = max_ff(nTable[indexIK].cost, zTable[indexKJ].cost);
+				float cost = max_ff(n_table[indexIK].cost, z_table[indexKJ].cost);
 
-				// If the path cost is less, update the best cost information
 				if (cost < minCost) {
 					minCost = cost;	
 					tmp_table[indexIJ].cost = cost;
-					tmp_table[indexIJ].n = nTable[indexIK].n + 1;
+					tmp_table[indexIJ].n = n_table[indexIK].n + 1;
 					tmp_table[indexIJ].path = malloc(tmp_table[indexIJ].n * sizeof(int));  
 					ED_reduction_copy_stoptable_path_and_add(tmp_table[indexIJ].path,
-															 nTable[indexIK].path,
-															 nTable[indexIK].n, j);
+															 n_table[indexIK].path,
+															 n_table[indexIK].n, j);
 				}
 			}
 		}
 	}
 
-	ED_reduction_delete_stoptable(npts_sq, nTable);
-	ED_reduction_copy_stoptable(npts_sq, tmp_table, nTable);
-	ED_reduction_n_stoptable(npts, npts_sq, n_stops, n + 1, nTable, zTable);
+	ED_reduction_delete_stoptable(npts_sq, n_table);
+	ED_reduction_copy_stoptable(npts_sq, tmp_table, n_table);
+	ED_reduction_n_stoptable(npts, npts_sq, n_stops, n + 1, n_table, z_table);
 }
 
-/* Interpolation Analysis ------------------------------------------------------------------------------------------- */
+/* Bezier Handle Tweaking ------------------------------------------------------------------------------------------- */
+/*
+ * This algorithm tries a set of different bezier-handle placements for the new keyframes. If a placement that matches
+ * the original curve more closely is found, it is kept.
+ *
+ * This algorithms works by first posing the f-curve as a set of segments, where a segment is defined as any part of the
+ * curve that lies between two key-frames. Forty tweaks are tested for right-most anchor of the keyframe to the left, 
+ * and another forty for the left-most anchor of the keyframe to the right. These first tweaks will test the
+ * handle at half the width of the section below the keyframe, and the last half the width above.
+ */
 
 double ED_reduction_interpolation_at(double f, double start_f, double end_f, Anchor anchors)
 {
@@ -351,15 +382,15 @@ double ED_reduction_interpolation_cost(Frame *original_frames, double start_f, d
 }
 
 Anchor ED_reduction_pick_anchor_for_segment(Frame *original_frames, double start_f, double end_f) {
-	double h_segment_length = (end_f - start_f) / 2.0;
-	double inc = h_segment_length / 20.0;
+	double half_segment_length = (end_f - start_f) / 2.0;
+	double inc = half_segment_length / 20.0;
 
 	double minCost = 99999.0;
 	double bestI = 0.0;
 	double bestJ = 0.0;
 
-	for (double i = -h_segment_length; i < h_segment_length; i += inc) {
-		for (double j = -h_segment_length; j < h_segment_length; j += inc) {
+	for (double i = -half_segment_length; i < half_segment_length; i += inc) {
+		for (double j = -half_segment_length; j < half_segment_length; j += inc) {
 
 			double cost = ED_reduction_interpolation_cost(original_frames, start_f, end_f, (Anchor) { i, j });
 			if (cost < minCost) {
@@ -373,10 +404,9 @@ Anchor ED_reduction_pick_anchor_for_segment(Frame *original_frames, double start
 	return (Anchor) { bestI, bestJ };
 }
 
-void ED_reduction_pick_anchors_for_fcurve(Anchor * anchors, Frame *original_frames, Frame *reduced_frames, int n_reduced) {
+void ED_reduction_tweak_fcurve_anchors(Anchor *anchors, Frame *org_frames, Frame *reduced_frames, int n_reduced)
+{
 	int i;
-
-	/* Initialize anchors to be on the keyframes themsevles */
 	for (i = 0; i < n_reduced; i++)
 		anchors[i] = (Anchor) { reduced_frames[i].f, reduced_frames[i].v };
 
@@ -393,7 +423,16 @@ void ED_reduction_pick_anchors_for_fcurve(Anchor * anchors, Frame *original_fram
 
 
 /* Reduction API ---------------------------------------------------------------------------------------------------- */
-
+/*
+ * Welcome! This module provides two algorithms used by the "Reduce Keyframes" wmOperator (GRAPH_OT_reduce). The module 
+ * is still under-development, but should working relatively as intended. Please contact Riro (Richard Roberts) for any
+ * questions, issues, or feedback - rykardo.r@gmail.com - thanks!
+ *
+ * These functions are called directly by the operator. The first function runs the reduction algorithm to find the best
+ * n keyframes that represented the given animation. The second function first reduces the keyframes of each motion
+ * curve to those indicated by the given indices, and then runs the bezier handle tweaking algorithm.
+ */
+ 
 int *ED_reduction_pick_best_frames(ListBase anim_data, int n_stops)
 {
 	int n_curves = ED_reduction_get_number_of_fcurves(anim_data) + 1;
@@ -405,29 +444,29 @@ int *ED_reduction_pick_best_frames(ListBase anim_data, int n_stops)
 	ED_reduction_fill_ndim_curve(ncurve, anim_data, n_frames);
 
 	/* Build dynamic-programming tables */
-	NStop zTable[n_frames_sq];
-	NStop nTable[n_frames_sq];
-	ED_reduction_init_stoptable(n_frames_sq, zTable);
-	ED_reduction_init_stoptable(n_frames_sq, nTable);
-	ED_reduction_zero_stoptable(n_frames, n_frames_sq, zTable, ncurve, n_curves);
-	ED_reduction_copy_stoptable(n_frames_sq, zTable, nTable);
+	NStop z_table[n_frames_sq];
+	NStop n_table[n_frames_sq];
+	ED_reduction_init_stoptable(n_frames_sq, z_table);
+	ED_reduction_init_stoptable(n_frames_sq, n_table);
+	ED_reduction_zero_stoptable(n_frames, n_frames_sq, z_table, ncurve, n_curves);
+	ED_reduction_copy_stoptable(n_frames_sq, z_table, n_table);
 
 	/* Recursively find the best point-path the first and last frame. */
-	ED_reduction_n_stoptable(n_frames, n_frames_sq, n_stops, 0, nTable, zTable);
+	ED_reduction_n_stoptable(n_frames, n_frames_sq, n_stops, 0, n_table, z_table);
 
 	/* Store frame indicies */
-	int *frameIndicies = malloc(nTable[n_frames - 1].n * sizeof (int));
-	ED_reduction_copy_stoptable_path(frameIndicies, nTable[n_frames - 1].path, nTable[n_frames - 1].n);
+	int *frameIndices = malloc(n_table[n_frames - 1].n * sizeof (int));
+	ED_reduction_copy_stoptable_path(frameIndices, n_table[n_frames - 1].path, n_table[n_frames - 1].n);
 	
 	/* Clean up */
-	ED_reduction_delete_stoptable(n_frames_sq, zTable);
-	ED_reduction_delete_stoptable(n_frames_sq, nTable);
+	ED_reduction_delete_stoptable(n_frames_sq, z_table);
+	ED_reduction_delete_stoptable(n_frames_sq, n_table);
 	ED_reduction_free_ndim_curve(&ncurve);
 	
-	return frameIndicies;
+	return frameIndices;
 }
 
-void ED_reduction_reduce_fcurves(ListBase anim_data, int *frameIndicies, int n_stops)
+void ED_reduction_reduce_fcurves(ListBase anim_data, int *frameIndices, int n_stops)
 {
 	bAnimListElem *ale;
 	BezTriple *bezt;
@@ -444,7 +483,7 @@ void ED_reduction_reduce_fcurves(ListBase anim_data, int *frameIndicies, int n_s
 		int index = 0;
 		for (i = 0, bezt = fcu->bezt; i < n_frames; i++, bezt++) {
 			original_frames[i] = (Frame) { bezt->vec[1][0], bezt->vec[1][1] };
-			if (ED_reduction_val_in_array(i, frameIndicies, n_stops)) {
+			if (ED_reduction_val_in_array(i, frameIndices, n_stops)) {
 				reduced_frames[index] = (Frame) { bezt->vec[1][0], bezt->vec[1][1] };
 				index ++;
 			}
