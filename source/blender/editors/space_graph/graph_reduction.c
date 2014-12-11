@@ -74,6 +74,10 @@
 
 
 /* Utilities -------------------------------------------------------------------------------------------------------- */
+/* 
+ * Utility functions that are used in this module. I feel Blender must have these functions written somewhere that I am
+ * not yet aware of, I intend to eventually remove them.
+ */
 
 bool ED_reduction_val_in_array(int val, int *arr, int size)
 {
@@ -139,7 +143,12 @@ int ED_reduction_get_number_of_fcurves(ListBase anim_data)
 	return n;
 }
 
+
 /* N-dimensional Curve Construction --------------------------------------------------------------------------------- */
+/* 
+ * Instead of running a cost function on n one-dimensional f-curves, we choose to use 1 n-dimensional curve. The
+ * following functions create, fill, and delete this data structure.
+ */
 
 NCurve ED_reduction_alloc_ndim_curve(int n_frames, int n_curves)
 {
@@ -159,7 +168,7 @@ void ED_reduction_fill_ndim_curve(NCurve ncurve, ListBase anim_data, int n_frame
 { 
 	bAnimListElem *ale;
 	BezTriple *bezt;
-	int i,j;
+	int i, j;
 	
 	for (j = 0; j < n_frames; j++)
 		ncurve[j][0] = (double) j;
@@ -172,33 +181,38 @@ void ED_reduction_fill_ndim_curve(NCurve ncurve, ListBase anim_data, int n_frame
 	}
 }
 
-/* Keyframe Placement Analysis -------------------------------------------------------------------------------------- */
 
-double ED_reduction_choord_to_frame_cost(double *p, double *q1, double *q2, int npts)
+/* Cost Analysis ---------------------------------------------------------------------------------------------------- */
+/* 
+ * The following functions are used when evaluating how successful a proposed reduction is. A proposed reduction is
+ * composed of segments, where each segments is defined by a start frame, a finish frame, and a path. The cost of the
+ * segment is taken to be the maximum perpendicular distance between the original f-curve and the multi-point path
+ * (each pair of points in the path is referred to as a "chord").
+ */
+
+double ED_reduction_chord_to_frame_cost(double *p, double *q1, double *q2, int npts)
 {
-	double pa[npts];
-	double ba[npts]; 
-	ED_reduction_substract_vectors(npts, pa, p, q1);
-	ED_reduction_substract_vectors(npts, ba, q2, q1);
+	double distPoint[npts];
+	double distLine[npts]; 
+	double maxDist[npts];
+	double t;
 
-	double t = ED_reduction_dot_vectors(npts, pa, ba) / ED_reduction_dot_vectors(npts, ba, ba);
+	ED_reduction_substract_vectors(npts, distPoint, p, q1);
+	ED_reduction_substract_vectors(npts, distLine, q2, q1);
 
-	double d1[npts];
-	ED_reduction_copy_vector(npts, d1, ba);
-	ED_reduction_scale_vector(npts, d1, t);
-	
-	double d2[npts];
-	ED_reduction_substract_vectors(npts, d2, pa, d1);
+	t = ED_reduction_dot_vectors(npts, distPoint, distLine) / ED_reduction_dot_vectors(npts, distLine, distLine);
+	ED_reduction_scale_vector(npts, distLine, t);
+	ED_reduction_substract_vectors(npts, maxDist, distPoint, distLine);
 
-	return ED_reduction_length_of_vector(npts, d2);
+	return ED_reduction_length_of_vector(npts, maxDist);
 }
 
-double ED_reduction_path_cost(NCurve ncurve, int start_f, int end_f, int n_curves)
+double ED_reduction_segment_cost(NCurve ncurve, int start_f, int end_f, int n_curves)
 {
 	double maxDist = 0;
 
 	for (int i = start_f; i < end_f; i++) {
-		double dist = ED_reduction_choord_to_frame_cost(ncurve[i], ncurve[start_f], ncurve[end_f], n_curves);
+		double dist = ED_reduction_chord_to_frame_cost(ncurve[i], ncurve[start_f], ncurve[end_f], n_curves);
 		
 		if (dist > maxDist)
 			maxDist = dist;
@@ -256,7 +270,7 @@ void ED_reduction_zero_stoptable(int npts, int npts_sq, NStop table[npts_sq], NC
 		for (int j = i + 1; j < npts; j++) {
 			
 			int index = i * npts + j;
-			table[index].cost = ED_reduction_path_cost(ncurve, i, j, n_curves);
+			table[index].cost = ED_reduction_segment_cost(ncurve, i, j, n_curves);
 			table[index].n = 2;
 
 			table[index].path = malloc(table[index].n * sizeof(int));  
