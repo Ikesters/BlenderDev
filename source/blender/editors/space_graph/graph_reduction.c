@@ -75,62 +75,22 @@
 
 /* Utilities -------------------------------------------------------------------------------------------------------- */
 
-bool ED_reduction_is_in_array(int val, int *arr, int size)
+bool ED_reduction_val_in_array(int val, int *arr, int size)
 {
-	int i;
-	for (i = 0; i < size; i++) {
+	for (int i = 0; i < size; i++) {
 		if (arr[i] == val)
 			return true;
 	}
 	return false;
 }
 
-
-/* F-Curve Roughness Anaylsis --------------------------------------------------------------------------------------- */
-
-/* Sums the roughness at each point the given fcurve */
-double ED_reduction_get_fcurve_roughness(FCurve *fcu)
-{
-	int npts = fcu->totvert;
-	int i;
-	BezTriple *bezt;
-
-	/* Store keyframes y values in a temporary vector */
-	double vals[npts];
-	for (i = 0, bezt = fcu->bezt; i < npts; i++, bezt++) {
-		vals[i] = bezt->vec[1][1]; 
-	}
-
-	/* Roughness at a point is taken as a (positive) approximation of the second order dervivative */
-	double totalRoughness = 0.0;
-	double roughness;
-	for (i = 0; i < npts - 2; i++) {
-		roughness = fabs(vals[i + 2] - 2 * vals[i + 1] + vals[i]);
-		totalRoughness += roughness;
-	}
-	
-	return totalRoughness;
-}
-
-/* Keyframe Placement Analysis -------------------------------------------------------------------------------------- */
-
-typedef struct Frame {
-	double f;
-	double v;
-} Frame;
-
-void subtract_ncurve(int npts, double out[npts], double *a, double *b)
+void ED_reduction_substract_vectors(int npts, double out[npts], double *a, double *b)
 {
 	for (int i = 0; i < npts; i++)
 		out[i] = a[i] - b[i];
 }
 
-void copy_ncurve(int npts, double out[npts], double *a) {
-	for (int i = 0; i < npts; i++)
-		out[i] = a[i];
-}
-
-double dot_ncurve(int npts, double *a, double *b)
+double ED_reduction_dot_vectors(int npts, double *a, double *b)
 {
 	double out = 0;
 	for (int i = 0; i < npts; i++)
@@ -139,13 +99,20 @@ double dot_ncurve(int npts, double *a, double *b)
 	return out;
 }
 
-void scalar_mult_ncurve(int npts, double out[npts], double s)
+void ED_reduction_copy_vector(int npts, double out[npts], double *a)
+{
+	for (int i = 0; i < npts; i++)
+		out[i] = a[i];
+}
+
+void ED_reduction_scale_vector(int npts, double out[npts], double s)
 {
 	for (int i = 0; i < npts; i++)
 		out[i] = out[i] * s;
 }
 
-double length_ncurve(int npts, double * a) {
+double ED_reduction_length_of_vector(int npts, double * a)
+{
 	double summedSqaures = 0;
 	for (int i = 0; i < npts; i++)
 		summedSqaures += pow(a[i], 2);
@@ -153,48 +120,77 @@ double length_ncurve(int npts, double * a) {
 	return sqrt(summedSqaures);
 }
 
+int ED_reduction_get_number_of_frames(ListBase anim_data)
+{
+	for (bAnimListElem *ale = anim_data.first; ale; ale = ale->next) {
+		FCurve * fcu = (FCurve *)ale->key_data;
+		return fcu->totvert;
+	}
 
+	return -1;
+}
 
+int ED_reduction_get_number_of_fcurves(ListBase anim_data)
+{
+	int n = 0;
+	for (bAnimListElem *ale = anim_data.first; ale; ale = ale->next)
+		n++;
+
+	return n;
+}
+
+/* N-dimensional Curve Construction --------------------------------------------------------------------------------- */
+
+NCurve ED_reduction_alloc_ndim_curve(int n_frames, int n_curves)
+{
+	NCurve ncurve = malloc (n_frames * sizeof (double *));
+	for (int i = 0; i < n_frames; i++) {
+		ncurve[i] = malloc (n_curves * sizeof (double));
+	}
+
+	return ncurve;
+}
+
+void ED_reduction_free_ndim_curve(NCurve *ncurve) {
+	free(ncurve);
+}
+
+void ED_reduction_fill_ndim_curve(NCurve ncurve, ListBase anim_data, int n_frames)
+{ 
+	bAnimListElem *ale;
+	BezTriple *bezt;
+	int i,j;
+	
+	for (j = 0; j < n_frames; j++)
+		ncurve[j][0] = (double) j;
+
+	for (i = 0, ale = anim_data.first; ale; i++, ale = ale->next) {
+		FCurve * fcu = (FCurve *)ale->key_data;
+
+		for (j = 0, bezt = fcu->bezt; j < fcu->totvert; j++, bezt++)
+			ncurve[j][i + 1] = bezt->vec[1][1];
+	}
+}
+
+/* Keyframe Placement Analysis -------------------------------------------------------------------------------------- */
 
 double ED_reduction_choord_to_frame_cost(double *p, double *q1, double *q2, int npts)
 {
 	double pa[npts];
 	double ba[npts]; 
-	subtract_ncurve(npts, pa, p, q1);
-	subtract_ncurve(npts, ba, q2, q1);
+	ED_reduction_substract_vectors(npts, pa, p, q1);
+	ED_reduction_substract_vectors(npts, ba, q2, q1);
 
-	double t = dot_ncurve(npts, pa, ba) / dot_ncurve(npts, ba, ba);
+	double t = ED_reduction_dot_vectors(npts, pa, ba) / ED_reduction_dot_vectors(npts, ba, ba);
 
 	double d1[npts];
-	copy_ncurve(npts, d1, ba);
-	scalar_mult_ncurve(npts, d1, t);
+	ED_reduction_copy_vector(npts, d1, ba);
+	ED_reduction_scale_vector(npts, d1, t);
 	
 	double d2[npts];
-	subtract_ncurve(npts, d2, pa, d1);
+	ED_reduction_substract_vectors(npts, d2, pa, d1);
 
-	// for (int i = 0; i < 1; i++) {
-	// 	printf("i=%d ---- ", i);
-	// 	printf(" p:%2.2f ",  p[i]);
-	// 	printf("q1:%2.2f ", q1[i]);
-	// 	printf("q2:%2.2f ", q2[i]);
-	// 	printf("pa:%2.2f ", pa[i]);
-	// 	printf("ba:%2.2f ", ba[i]);
-	// 	printf("d1:%2.2f ", d1[i]);
-	// 	printf("d2:%2.2f ", d2[i]);
-	// 	printf("\n");
-	// }
-
-	// p:0.11
-	// q1:0.61
-	// q2:-0.09
-	// pa:-0.49
-	// ba:-0.70
-	// d1:-0.49
-	// d2:-0.00
-
-	double length = length_ncurve(npts, d2);
-	printf("LENGTH %2.2f\n", length);
-	return length;
+	return ED_reduction_length_of_vector(npts, d2);
 }
 
 double ED_reduction_path_cost(NCurve ncurve, int start_f, int end_f, int n_curves)
@@ -212,12 +208,6 @@ double ED_reduction_path_cost(NCurve ncurve, int start_f, int end_f, int n_curve
 }
 
 /* NStop Tables ------------------------------------------------------------------------------------------------------ */
-
-typedef struct NStop {
-	float cost;
-	int n;
-	int *path;
-} NStop;
 
 void ED_reduction_copy_stoptable_path(int *tgt, int *src, int npts)
 {
@@ -316,11 +306,6 @@ void ED_reduction_n_stoptable(int npts, int npts_sq, int n_stops, int n, NStop n
 
 /* Interpolation Analysis ------------------------------------------------------------------------------------------- */
 
-typedef struct Anchor {
-	double p1;
-	double p2;
-} Anchor;
-
 double ED_reduction_interpolation_at(double f, double start_f, double end_f, Anchor anchors)
 {
 	double numer = f - start_f;
@@ -376,8 +361,10 @@ Anchor ED_reduction_pick_anchor_for_segment(Frame *original_frames, double start
 
 void ED_reduction_pick_anchors_for_fcurve(Anchor * anchors, Frame *original_frames, Frame *reduced_frames, int n_reduced) {
 	int i;
+
+	/* Initialize anchors to be on the keyframes themsevles */
 	for (i = 0; i < n_reduced; i++)
-		anchors[i] = (Anchor) { 0.0, 0.0 };
+		anchors[i] = (Anchor) { reduced_frames[i].f, reduced_frames[i].v };
 
 	for (i = 1; i < n_reduced; i++) {
 		double start_f = reduced_frames[i - 1].f;
@@ -393,63 +380,25 @@ void ED_reduction_pick_anchors_for_fcurve(Anchor * anchors, Frame *original_fram
 
 /* Reduction API ---------------------------------------------------------------------------------------------------- */
 
-int *ED_reduction_pick_best_frames_fcurve(ListBase anim_data, int n_stops)
+int *ED_reduction_pick_best_frames(ListBase anim_data, int n_stops)
 {
-	bAnimListElem *ale;
-	BezTriple *bezt;
-	int i;
-	int j;
+	int n_curves = ED_reduction_get_number_of_fcurves(anim_data) + 1;
+	int n_frames = ED_reduction_get_number_of_frames(anim_data);
+	int n_frames_sq = n_frames * n_frames;
 
-	int n_curves = 1;
-	int n_frames = 0;
-	int n_frames_sq = 0;
+	/* Construct n-dimensional curve */
+	NCurve ncurve = ED_reduction_alloc_ndim_curve(n_frames, n_curves);
+	ED_reduction_fill_ndim_curve(ncurve, anim_data, n_frames);
 
-
-	printf("SETTING COUNTS\n");
-	for (ale = anim_data.first; ale; ale = ale->next) {
-		n_curves ++;
-	}
-
-	for (i = 0, ale = anim_data.first; ale; i++, ale = ale->next) {
-		if (i == 0) {
-			FCurve * fcu = (FCurve *)ale->key_data;
-			n_frames = fcu->totvert;
-			n_frames_sq = n_frames * n_frames;
-		}
-	}
-
-	printf("n_curves=%d n_frames=%d n_frames_sq=%d\n", n_curves, n_frames, n_frames_sq);
-
-
-	printf("MAKING NCURVE\n");
-	NCurve ncurve = malloc (n_frames * sizeof (double *));
-	for (i = 0; i < n_frames; i++) {
-		ncurve[i] = malloc (n_curves * sizeof (double));
-	}
-
-	for (j = 0; j < n_frames; j++) {
-		ncurve[j][0] = (double) j;	
-	}
-
-	for (i = 0, ale = anim_data.first; ale; i++, ale = ale->next) {
-		FCurve * fcu = (FCurve *)ale->key_data;
-
-		for (j = 0, bezt = fcu->bezt; j < fcu->totvert; j++, bezt++) {
-			printf("frame=%d curve=%d\n", j, i);
-			ncurve[j][i + 1] = bezt->vec[1][1];	
-		}
-	}
-
-	/* Build stop tables */
+	/* Build dynamic-programming tables */
 	NStop zTable[n_frames_sq];
 	NStop nTable[n_frames_sq];
-
 	ED_reduction_init_stoptable(n_frames_sq, zTable);
-	printf("MAKING Z STOP\n");
-	ED_reduction_zero_stoptable(n_frames, n_frames_sq, zTable, ncurve, n_curves);
 	ED_reduction_init_stoptable(n_frames_sq, nTable);
-	printf("MAKING N STOP\n");
+	ED_reduction_zero_stoptable(n_frames, n_frames_sq, zTable, ncurve, n_curves);
 	ED_reduction_copy_stoptable(n_frames_sq, zTable, nTable);
+
+	/* Recursively find the best point-path the first and last frame. */
 	ED_reduction_n_stoptable(n_frames, n_frames_sq, n_stops, 0, nTable, zTable);
 
 	/* Store frame indicies */
@@ -459,85 +408,50 @@ int *ED_reduction_pick_best_frames_fcurve(ListBase anim_data, int n_stops)
 	/* Clean up */
 	ED_reduction_delete_stoptable(n_frames_sq, zTable);
 	ED_reduction_delete_stoptable(n_frames_sq, nTable);
+	ED_reduction_free_ndim_curve(&ncurve);
 	
 	return frameIndicies;
 }
 
-int *ED_reduction_pick_best_frames_fcurves(ListBase anim_data, int n_stops)
-{
-	// bAnimListElem *ale;
-	// int i;
-
-	/* Get the index of the roughest curve  */
-	// double maxRoughness = 0;
-	// int maxRoughnessIndex = 0;
-	// for (i = 0, ale = anim_data.first; ale; i++, ale = ale->next) {
-	// 	double roughness = ED_reduction_get_fcurve_roughness((FCurve *)ale->key_data);
-	// 	if (roughness > maxRoughness) {
-	// 		maxRoughness = roughness;
-	// 		maxRoughnessIndex = i;
-	// 	}
-	// }
-
-	/* Get the best placement of n keyframes for the roughest curve */
-	// int * frameIndicies;
-
-	/* ??? How can I access the bAnimListElem at a given index? */
-	// for (i = 0, ale = anim_data.first; ale; i++, ale = ale->next) {
-	// 	if (i == maxRoughnessIndex)
-	// 		frameIndicies = ED_reduction_pick_best_frames_fcurve((FCurve *)ale->key_data, n_stops);
-	// }
-	// return frameIndicies;
-
-	return ED_reduction_pick_best_frames_fcurve(anim_data, n_stops);
-}
-
-void ED_reduction_reduce_fcurve_to_frames(FCurve *fcu, int *frameIndicies, int n_stops)
-{
-	int n_frames = fcu->totvert;
-	int i;
-	BezTriple *bezt;
-
-	/* Cache data for each frame in given indicies */
-	Frame original_frames[n_frames];
-	Frame reduced_frames[n_stops];
-	
-
-	int index = 0;
-	for (i = 0, bezt = fcu->bezt; i < n_frames; i++, bezt++) {
-		original_frames[i] = (Frame) { bezt->vec[1][0], bezt->vec[1][1] };
-
-		if (ED_reduction_is_in_array(i, frameIndicies, n_stops)) {
-			reduced_frames[index] = (Frame) { bezt->vec[1][0], bezt->vec[1][1] };
-
-			index ++;
-		}
-	}
-
-	Anchor anchors[n_stops];
-	ED_reduction_pick_anchors_for_fcurve(anchors, original_frames, reduced_frames, n_stops);
-
-	/* Delete all keys, and then rebuild curves using cache */
-	clear_fcurve_keys(fcu);
-	for (i = 0; i < n_stops; i++)
-		insert_vert_fcurve(fcu, reduced_frames[i].f, reduced_frames[i].v, 1);
-	calchandles_fcurve(fcu);
-
-	for (i = 0, bezt = fcu->bezt; i < fcu->totvert; i++, bezt++) {
-		if (i != 0)
-			bezt->vec[0][1] = anchors[i].p1;
-		if (i != n_stops - 1)
-			bezt->vec[2][1] = anchors[i].p2;
-			
-	}
-}
-
-void ED_reduction_reduce_fcurves_to_frames(ListBase anim_data, int *frameIndicies, int n_stops)
+void ED_reduction_reduce_fcurves(ListBase anim_data, int *frameIndicies, int n_stops)
 {
 	bAnimListElem *ale;
+	BezTriple *bezt;
+	FCurve * fcu;
+	int i, n_frames;
 
 	for (ale = anim_data.first; ale; ale = ale->next) {
-		ED_reduction_reduce_fcurve_to_frames((FCurve *)ale->key_data, frameIndicies, n_stops);
+		fcu = (FCurve *)ale->key_data;
+		n_frames = fcu->totvert;
+		
+		/* Cache frame information */
+		Frame original_frames[n_frames];
+		Frame reduced_frames[n_stops];
+		int index = 0;
+		for (i = 0, bezt = fcu->bezt; i < n_frames; i++, bezt++) {
+			original_frames[i] = (Frame) { bezt->vec[1][0], bezt->vec[1][1] };
+			if (ED_reduction_val_in_array(i, frameIndicies, n_stops)) {
+				reduced_frames[index] = (Frame) { bezt->vec[1][0], bezt->vec[1][1] };
+				index ++;
+			}
+		}
+
+		/* Delete all the existing keyframes, and then rebuild based on the cached keyframe data */
+		clear_fcurve_keys(fcu);
+		for (i = 0; i < n_stops; i++)
+			insert_vert_fcurve(fcu, reduced_frames[i].f, reduced_frames[i].v, 1);
+		calchandles_fcurve(fcu);
+
+		/* Tweaking the bezier handles of the new keyframes to best repliciate the original data */
+		Anchor anchors[n_stops];
+		ED_reduction_pick_anchors_for_fcurve(anchors, original_frames, reduced_frames, n_stops);
+		for (i = 0, bezt = fcu->bezt; i < fcu->totvert; i++, bezt++) {
+			if (i != 0)
+				bezt->vec[0][1] = anchors[i].p1;
+			if (i != n_stops - 1)
+				bezt->vec[2][1] = anchors[i].p2;
+		}
+
 		ale->update |= ANIM_UPDATE_DEFAULT;
 	}
 }

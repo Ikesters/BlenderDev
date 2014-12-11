@@ -32,58 +32,78 @@
 #define __ED_REDUCTION_H__
 
 
-/* Utilities ---------------------------------------------------------------- */
+/* Utilities -------------------------------------------------------------------------------------------------------- */
 
-bool ED_reduction_is_in_array(int val, int *arr, int size);
+bool   ED_reduction_val_in_array          (int val, int *arr, int size);
+void   ED_reduction_substract_vectors     (int npts, double out[npts], double *a, double *b);
+double ED_reduction_dot_vectors           (int npts, double *a, double *b);
+void   ED_reduction_copy_vector           (int npts, double out[npts], double *a);
+void   ED_reduction_scale_vector          (int npts, double out[npts], double s);
+double ED_reduction_length_of_vector      (int npts, double * a);
+int    ED_reduction_get_number_of_frames  (ListBase anim_data);
+int    ED_reduction_get_number_of_fcurves (ListBase anim_data);
 
+/* N-dimensional Curve Construction --------------------------------------------------------------------------------- */
 
-/* F-Curve Roughness Anaylsis ----------------------------------------------- */
-
-double ED_reduction_get_fcurve_roughness(struct FCurve *fcu);
-
-
-/* Keyframe Placement Analysis ---------------------------------------------- */
-
-struct Frame;
 typedef double ** NCurve;
 
-void subtract_ncurve(int npts, double *out, double *a, double *b);
-double ED_reduction_choord_to_frame_cost(double *p, double *q1, double *q2, int npts);
-double ED_reduction_path_cost(NCurve ncurve, int start_f, int end_f, int n_curves);
+NCurve ED_reduction_alloc_ndim_curve (int n_frames, int n_curves);
+void   ED_reduction_fill_ndim_curve  (NCurve ncurve, ListBase anim_data, int n_frames);
+void ED_reduction_free_ndim_curve(NCurve *ncurve);
 
 
-/* NStop Tables ------------------------------------------------------------- */
+/* Keyframe Placement Analysis -------------------------------------------------------------------------------------- */
 
-struct NStop;
+void   ED_reduction_substract_vectors    (int npts, double *out, double *a, double *b);
+double ED_reduction_choord_to_frame_cost (double *p, double *q1, double *q2, int npts);
+double ED_reduction_path_cost            (NCurve ncurve, int start_f, int end_f, int n_curves);
 
-void ED_reduction_copy_stoptable_path(int *tgt, int *src, int npts);
-void ED_reduction_copy_stoptable_path_and_add(int *tgt, int *src, int npts, int v);
-void ED_reduction_init_stoptable(int npts_sq, struct NStop *table);
-void ED_reduction_copy_stoptable(int npts_sq, struct NStop *a, struct NStop *b);
-void ED_reduction_delete_stoptable(int npts_sq, struct NStop *table);
-void ED_reduction_zero_stoptable(int npts, int npts_sq, struct NStop *table, NCurve ncurve, int n_curves);
-void ED_reduction_n_stoptable(int npts, int npts_sq, int n_stops, int n, struct NStop *nTable, struct NStop *zTable);
+
+/* NStop Tables ----------------------------------------------------------------------------------------------------- */
+
+typedef struct NStop {
+	float cost;
+	int n;
+	int *path;
+} NStop;
+
+void ED_reduction_copy_stoptable_path         (int *tgt, int *src, int npts);
+void ED_reduction_copy_stoptable_path_and_add (int *tgt, int *src, int npts, int v);
+void ED_reduction_init_stoptable              (int npts_sq, NStop *table);
+void ED_reduction_copy_stoptable              (int npts_sq, NStop *a, NStop *b);
+void ED_reduction_delete_stoptable            (int npts_sq, NStop *table);
+void ED_reduction_zero_stoptable              (int npts, int npts_sq, NStop *table, NCurve ncurve, int n_curves);
+void ED_reduction_n_stoptable                 (int npts, int npts_sq, int n_stops, int n, NStop *nTable, NStop *zTable);
 
 
 /* Interpolation Analysis ------------------------------------------------------------------------------------------- */
 
-struct Anchor;
+typedef struct Frame {
+	double f;
+	double v;
+} Frame;
 
-double ED_reduction_interpolation_at(double f, double start_f, double end_f, struct Anchor anchors);
-double ED_reduction_interpolation_cost(struct Frame *original_frames, double start_f, double end_f, struct Anchor anchors);
-struct Anchor ED_reduction_pick_anchor_for_segment(struct Frame *original_frames, double start_f, double end_f);
-void ED_reduction_pick_anchors_for_fcurve(struct Anchor *anchors, struct Frame *original_frames, struct Frame *reduced_frames, int n_reduced);
+typedef struct Anchor {
+	double p1;
+	double p2;
+} Anchor;
+
+double ED_reduction_interpolation_at        (double f, double start_f, double end_f, Anchor anchors);
+double ED_reduction_interpolation_cost      (Frame *original_frames, double start_f, double end_f, Anchor anchors);
+Anchor ED_reduction_pick_anchor_for_segment (Frame *original_frames, double start_f, double end_f);
+void   ED_reduction_pick_anchors_for_fcurve (Anchor *anchors, Frame *original_frames, Frame *reduced_frames, int n_reduced);
 
 
-/* Reduction ---------------------------------------------------------------- */
+/* Reduction -------------------------------------------------------------------------------------------------------- */
 
-int *ED_reduction_pick_best_frames_fcurve(ListBase anim_data, int n_stops);
-int *ED_reduction_pick_best_frames_fcurves(ListBase anim_data, int n_stops);
-void ED_reduction_reduce_fcurve_to_frames(struct FCurve *fcu, int *frameIndicies, int n_stops);
-void ED_reduction_reduce_fcurves_to_frames(ListBase anim_data, int *frameIndicies, int n_stops);
+int *ED_reduction_pick_best_frames (ListBase anim_data, int n_stops);
+void ED_reduction_reduce_fcurves   (ListBase anim_data, int *frameIndicies, int n_stops);
 
 
-/* Registration, called in screen_ops.c:ED_operatortypes_screen() */
+/* Registration ----------------------------------------------------------------------------------------------------- */
+
 void ED_operatortypes_reduction(void); 
 
+
 #endif /* __ED_REDUCTION_H__ */
+
