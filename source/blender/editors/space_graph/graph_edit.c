@@ -1074,11 +1074,7 @@ static int reduce_keyframes_invoke_wrapper(bContext *C, wmOperator *op, const wm
 	else
 		BKE_report(op->reports, RPT_ERROR, "Programming error: operator does not actually have code to do anything!");
 		
-	if (sa->spacetype != SPACE_TIME) {
-		if ((retval & (OPERATOR_FINISHED | OPERATOR_INTERFACE)) == 0)
-			retval |= OPERATOR_PASS_THROUGH;
-	}
-	
+	retval |= OPERATOR_PASS_THROUGH;
 	return retval;
 }
  
