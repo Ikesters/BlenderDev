@@ -1041,3 +1041,8 @@ void fill_vn_fl(float *array_tar, const int size, const float val)
 		*(tar--) = val;
 	}
 }
+
+void copy_vn_vn(float *array_tar, float *array_src, const int size)
+{
+	memcpy(array_tar, array_src, sizeof(float) * size);
+}

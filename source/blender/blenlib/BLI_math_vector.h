@@ -319,6 +319,7 @@ void fill_vn_i(int *array_tar, const int size, const int val);
 void fill_vn_short(short *array_tar, const int size, const short val);
 void fill_vn_ushort(unsigned short *array_tar, const int size, const unsigned short val);
 void fill_vn_fl(float *array_tar, const int size, const float val);
+void copy_vn_vn(float *array_tar, float *array_src, const int size);
 
 /**************************** Inline Definitions ******************************/
 

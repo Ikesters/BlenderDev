@@ -99,15 +99,6 @@ int ED_reduction_get_number_of_frames(ListBase *anim_data)
 	return -1;
 }
 
-int ED_reduction_get_number_of_fcurves(ListBase *anim_data)
-{
-	int n = 0;
-	for (bAnimListElem *ale = anim_data->first; ale; ale = ale->next)
-		n++;
-
-	return n;
-}
-
 
 /* N-dimensional Curve Construction --------------------------------------------------------------------------------- */
 /* 
@@ -160,11 +151,19 @@ float ED_reduction_chord_to_frame_cost(float *p, float *q1, float *q2, int npts)
 	float distPoint[npts];
 	float distLine[npts]; 
 	float maxDist[npts];
-	float t;
+	float t, numer, denom;
 
 	sub_vn_vnvn(distPoint, p, q1, npts);
 	sub_vn_vnvn(distLine, q2, q1, npts);
-	t = dot_vn_vn(distPoint, distLine, npts) / dot_vn_vn(distLine, distLine, npts);
+
+	numer = dot_vn_vn(distPoint, distLine, npts);
+	denom = dot_vn_vn( distLine, distLine, npts);
+	if (denom != 0) {
+		t = numer / denom;
+	} else {
+		t = numer;
+	}
+
 	mul_vn_fl(distLine, npts, t);
 	sub_vn_vnvn(maxDist, distPoint, distLine, npts);
 
@@ -399,7 +398,8 @@ void ED_reduction_tweak_fcurve_anchors(Anchor *anchors, Frame *org_frames, Frame
  
 int *ED_reduction_pick_best_frames(ListBase *anim_data, int n_stops)
 {
-	int n_curves = ED_reduction_get_number_of_fcurves(anim_data) + 1;
+
+	int n_curves = BLI_countlist(anim_data) + 1;
 	int n_frames = ED_reduction_get_number_of_frames(anim_data);
 	int n_frames_sq = n_frames * n_frames;
 

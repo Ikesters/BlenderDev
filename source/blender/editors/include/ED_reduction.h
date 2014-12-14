@@ -40,7 +40,6 @@
 
 bool   ED_reduction_val_in_array          (int val, int *arr, int size);
 int    ED_reduction_get_number_of_frames  (ListBase *anim_data);
-int    ED_reduction_get_number_of_fcurves (ListBase *anim_data);
 
 
 /* N-dimensional Curve Construction --------------------------------------------------------------------------------- */
