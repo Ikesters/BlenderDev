@@ -124,9 +124,9 @@ double ED_reduction_length_of_vector(int npts, double * a)
 	return sqrt(summedSqaures);
 }
 
-int ED_reduction_get_number_of_frames(ListBase anim_data)
+int ED_reduction_get_number_of_frames(ListBase *anim_data)
 {
-	for (bAnimListElem *ale = anim_data.first; ale; ale = ale->next) {
+	for (bAnimListElem *ale = anim_data->first; ale; ale = ale->next) {
 		FCurve * fcu = (FCurve *)ale->key_data;
 		return fcu->totvert;
 	}
@@ -134,10 +134,10 @@ int ED_reduction_get_number_of_frames(ListBase anim_data)
 	return -1;
 }
 
-int ED_reduction_get_number_of_fcurves(ListBase anim_data)
+int ED_reduction_get_number_of_fcurves(ListBase *anim_data)
 {
 	int n = 0;
-	for (bAnimListElem *ale = anim_data.first; ale; ale = ale->next)
+	for (bAnimListElem *ale = anim_data->first; ale; ale = ale->next)
 		n++;
 
 	return n;
@@ -164,7 +164,7 @@ void ED_reduction_free_ndim_curve(NCurve *ncurve) {
 	free(ncurve);
 }
 
-void ED_reduction_fill_ndim_curve(NCurve ncurve, ListBase anim_data, int n_frames)
+void ED_reduction_fill_ndim_curve(NCurve ncurve, ListBase *anim_data, int n_frames)
 { 
 	bAnimListElem *ale;
 	BezTriple *bezt;
@@ -173,7 +173,7 @@ void ED_reduction_fill_ndim_curve(NCurve ncurve, ListBase anim_data, int n_frame
 	for (j = 0; j < n_frames; j++)
 		ncurve[j][0] = (double) j;
 
-	for (i = 0, ale = anim_data.first; ale; i++, ale = ale->next) {
+	for (i = 0, ale = anim_data->first; ale; i++, ale = ale->next) {
 		FCurve * fcu = (FCurve *)ale->key_data;
 
 		for (j = 0, bezt = fcu->bezt; j < fcu->totvert; j++, bezt++)
@@ -433,7 +433,7 @@ void ED_reduction_tweak_fcurve_anchors(Anchor *anchors, Frame *org_frames, Frame
  * curve to those indicated by the given indices, and then runs the bezier handle tweaking algorithm.
  */
  
-int *ED_reduction_pick_best_frames(ListBase anim_data, int n_stops)
+int *ED_reduction_pick_best_frames(ListBase *anim_data, int n_stops)
 {
 	int n_curves = ED_reduction_get_number_of_fcurves(anim_data) + 1;
 	int n_frames = ED_reduction_get_number_of_frames(anim_data);
@@ -466,14 +466,14 @@ int *ED_reduction_pick_best_frames(ListBase anim_data, int n_stops)
 	return frameIndices;
 }
 
-void ED_reduction_reduce_fcurves(ListBase anim_data, int *frameIndices, int n_stops)
+void ED_reduction_reduce_fcurves(ListBase *anim_data, int *frameIndices, int n_stops)
 {
 	bAnimListElem *ale;
 	BezTriple *bezt;
 	FCurve * fcu;
 	int i, n_frames;
 
-	for (ale = anim_data.first; ale; ale = ale->next) {
+	for (ale = anim_data->first; ale; ale = ale->next) {
 		fcu = (FCurve *)ale->key_data;
 		n_frames = fcu->totvert;
 		

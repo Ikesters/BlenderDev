@@ -1025,14 +1025,15 @@ static void reduce_keyframes(bAnimContext *ac, int key_count)
 {   
 	ListBase anim_data = {NULL, NULL};
 	int filter;
+	int *frameIndicies;
 	
 	/* filter data */
 	filter = (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_CURVE_VISIBLE | ANIMFILTER_FOREDIT | ANIMFILTER_NODUPLIS | ANIMFILTER_SEL);
 	ANIM_animdata_filter(ac, &anim_data, filter, ac->data, ac->datatype);
 
 	/* Reduce keyframes */
-	int *frameIndicies = ED_reduction_pick_best_frames(anim_data, key_count);
-	ED_reduction_reduce_fcurves(anim_data, frameIndicies, key_count);
+	frameIndicies = ED_reduction_pick_best_frames(&anim_data, key_count);
+	ED_reduction_reduce_fcurves(&anim_data, frameIndicies, key_count);
 
 	ANIM_animdata_update(ac, &anim_data);
 	ANIM_animdata_freelist(&anim_data);

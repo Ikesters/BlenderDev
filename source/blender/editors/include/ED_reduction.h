@@ -44,8 +44,8 @@ double ED_reduction_dot_vectors           (int npts, double *a, double *b);
 void   ED_reduction_copy_vector           (int npts, double out[npts], double *a);
 void   ED_reduction_scale_vector          (int npts, double out[npts], double s);
 double ED_reduction_length_of_vector      (int npts, double * a);
-int    ED_reduction_get_number_of_frames  (ListBase anim_data);
-int    ED_reduction_get_number_of_fcurves (ListBase anim_data);
+int    ED_reduction_get_number_of_frames  (ListBase *anim_data);
+int    ED_reduction_get_number_of_fcurves (ListBase *anim_data);
 
 
 /* N-dimensional Curve Construction --------------------------------------------------------------------------------- */
@@ -57,7 +57,7 @@ int    ED_reduction_get_number_of_fcurves (ListBase anim_data);
 typedef double ** NCurve;
 
 NCurve ED_reduction_alloc_ndim_curve (int n_frames, int n_curves);
-void   ED_reduction_fill_ndim_curve  (NCurve ncurve, ListBase anim_data, int n_frames);
+void   ED_reduction_fill_ndim_curve  (NCurve ncurve, ListBase *anim_data, int n_frames);
 void  ED_reduction_free_ndim_curve   (NCurve *ncurve);
 
 
@@ -152,8 +152,8 @@ void   ED_reduction_tweak_fcurve_anchors    (Anchor *anchors, Frame *org_frames,
  * curve to those indicated by the given indices, and then runs the bezier handle tweaking algorithm.
  */
 
-int *ED_reduction_pick_best_frames (ListBase anim_data, int n_stops);
-void ED_reduction_reduce_fcurves   (ListBase anim_data, int *frameIndices, int n_stops);
+int *ED_reduction_pick_best_frames (ListBase *anim_data, int n_stops);
+void ED_reduction_reduce_fcurves   (ListBase *anim_data, int *frameIndices, int n_stops);
 
 
 /* Registration ----------------------------------------------------------------------------------------------------- */
