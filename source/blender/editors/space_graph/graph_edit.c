@@ -1064,7 +1064,6 @@ static int reduce_keyframes_exec(bContext *C, wmOperator *op)
 
 static int reduce_keyframes_invoke_wrapper(bContext *C, wmOperator *op, const wmEvent *event)
 {
-	ScrArea *sa = CTX_wm_area(C);
 	int retval = OPERATOR_PASS_THROUGH;
 	
 	if (WM_operator_props_popup)

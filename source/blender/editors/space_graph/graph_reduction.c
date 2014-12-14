@@ -45,6 +45,7 @@
 
 #include "BLI_blenlib.h"
 #include "BLI_math_base.h"
+#include "BLI_math_vector.h"
 
 #include "BKE_context.h"
 #include "BKE_fcurve.h"
@@ -88,42 +89,6 @@ bool ED_reduction_val_in_array(int val, int *arr, int size)
 	return false;
 }
 
-void ED_reduction_substract_vectors(int npts, double out[npts], double *a, double *b)
-{
-	for (int i = 0; i < npts; i++)
-		out[i] = a[i] - b[i];
-}
-
-double ED_reduction_dot_vectors(int npts, double *a, double *b)
-{
-	double out = 0;
-	for (int i = 0; i < npts; i++)
-		out += a[i] * b[i];
-
-	return out;
-}
-
-void ED_reduction_copy_vector(int npts, double out[npts], double *a)
-{
-	for (int i = 0; i < npts; i++)
-		out[i] = a[i];
-}
-
-void ED_reduction_scale_vector(int npts, double out[npts], double s)
-{
-	for (int i = 0; i < npts; i++)
-		out[i] = out[i] * s;
-}
-
-double ED_reduction_length_of_vector(int npts, double * a)
-{
-	double summedSqaures = 0;
-	for (int i = 0; i < npts; i++)
-		summedSqaures += pow(a[i], 2);
-
-	return sqrt(summedSqaures);
-}
-
 int ED_reduction_get_number_of_frames(ListBase *anim_data)
 {
 	for (bAnimListElem *ale = anim_data->first; ale; ale = ale->next) {
@@ -152,9 +117,9 @@ int ED_reduction_get_number_of_fcurves(ListBase *anim_data)
 
 NCurve ED_reduction_alloc_ndim_curve(int n_frames, int n_curves)
 {
-	NCurve ncurve = malloc (n_frames * sizeof (double *));
+	NCurve ncurve = malloc (n_frames * sizeof (float *));
 	for (int i = 0; i < n_frames; i++) {
-		ncurve[i] = malloc (n_curves * sizeof (double));
+		ncurve[i] = malloc (n_curves * sizeof (float));
 	}
 
 	return ncurve;
@@ -171,7 +136,7 @@ void ED_reduction_fill_ndim_curve(NCurve ncurve, ListBase *anim_data, int n_fram
 	int i, j;
 	
 	for (j = 0; j < n_frames; j++)
-		ncurve[j][0] = (double) j;
+		ncurve[j][0] = (float) j;
 
 	for (i = 0, ale = anim_data->first; ale; i++, ale = ale->next) {
 		FCurve * fcu = (FCurve *)ale->key_data;
@@ -190,29 +155,28 @@ void ED_reduction_fill_ndim_curve(NCurve ncurve, ListBase *anim_data, int n_fram
  * (each pair of points in the path is referred to as a "chord").
  */
 
-double ED_reduction_chord_to_frame_cost(double *p, double *q1, double *q2, int npts)
+float ED_reduction_chord_to_frame_cost(float *p, float *q1, float *q2, int npts)
 {
-	double distPoint[npts];
-	double distLine[npts]; 
-	double maxDist[npts];
-	double t;
+	float distPoint[npts];
+	float distLine[npts]; 
+	float maxDist[npts];
+	float t;
 
-	ED_reduction_substract_vectors(npts, distPoint, p, q1);
-	ED_reduction_substract_vectors(npts, distLine, q2, q1);
+	sub_vn_vnvn(distPoint, p, q1, npts);
+	sub_vn_vnvn(distLine, q2, q1, npts);
+	t = dot_vn_vn(distPoint, distLine, npts) / dot_vn_vn(distLine, distLine, npts);
+	mul_vn_fl(distLine, npts, t);
+	sub_vn_vnvn(maxDist, distPoint, distLine, npts);
 
-	t = ED_reduction_dot_vectors(npts, distPoint, distLine) / ED_reduction_dot_vectors(npts, distLine, distLine);
-	ED_reduction_scale_vector(npts, distLine, t);
-	ED_reduction_substract_vectors(npts, maxDist, distPoint, distLine);
-
-	return ED_reduction_length_of_vector(npts, maxDist);
+	return sqrt(len_squared_vn(maxDist, npts));
 }
 
-double ED_reduction_segment_cost(NCurve ncurve, int start_f, int end_f, int n_curves)
+float ED_reduction_segment_cost(NCurve ncurve, int start_f, int end_f, int n_curves)
 {
-	double maxDist = 0;
+	float maxDist = 0;
 
 	for (int i = start_f; i < end_f; i++) {
-		double dist = ED_reduction_chord_to_frame_cost(ncurve[i], ncurve[start_f], ncurve[end_f], n_curves);
+		float dist = ED_reduction_chord_to_frame_cost(ncurve[i], ncurve[start_f], ncurve[end_f], n_curves);
 		
 		if (dist > maxDist)
 			maxDist = dist;
@@ -351,11 +315,11 @@ void ED_reduction_n_stoptable(int npts, int npts_sq, int n_stops, int n, NStop n
  * handle at half the width of the section below the keyframe, and the last half the width above.
  */
 
-double ED_reduction_interpolation_at(double f, double start_f, double end_f, Anchor anchors)
+float ED_reduction_interpolation_at(float f, float start_f, float end_f, Anchor anchors)
 {
-	double numer = f - start_f;
-	double denom = end_f - start_f;
-	double t = denom != 0.0 ? numer / denom : numer;
+	float numer = f - start_f;
+	float denom = end_f - start_f;
+	float t = denom != 0.0 ? numer / denom : numer;
 
 	return                 pow(1 - t, 3) * start_f     + 
 	       3 *     t     * pow(1 - t, 2) * anchors.p1 +
@@ -363,15 +327,15 @@ double ED_reduction_interpolation_at(double f, double start_f, double end_f, Anc
                pow(t ,3)                 * end_f;
 }
 
-double ED_reduction_interpolation_cost(Frame *org_frames, double start_f, double end_f, Anchor anchors) {
-	double maxCost = 0;
+float ED_reduction_interpolation_cost(Frame *org_frames, float start_f, float end_f, Anchor anchors) {
+	float maxCost = 0;
 
 	int index = 0;
-	for (double i = start_f; i < end_f; i += 1.0) {
-		double originalV = org_frames[index].v;
-		double interpedV = ED_reduction_interpolation_at(i, start_f, end_f, anchors);
+	for (float i = start_f; i < end_f; i += 1.0) {
+		float originalV = org_frames[index].v;
+		float interpedV = ED_reduction_interpolation_at(i, start_f, end_f, anchors);
 
-		double cost = fabs(originalV - interpedV);
+		float cost = fabs(originalV - interpedV);
 		if (cost > maxCost)
 			maxCost = cost;
 
@@ -381,18 +345,18 @@ double ED_reduction_interpolation_cost(Frame *org_frames, double start_f, double
 	return maxCost;
 }
 
-Anchor ED_reduction_pick_anchor_for_segment(Frame *org_frames, double start_f, double end_f) {
-	double half_segment_length = (end_f - start_f) / 2.0;
-	double inc = half_segment_length / 20.0;
+Anchor ED_reduction_pick_anchor_for_segment(Frame *org_frames, float start_f, float end_f) {
+	float half_segment_length = (end_f - start_f) / 2.0;
+	float inc = half_segment_length / 20.0;
 
-	double minCost = 99999.0;
-	double bestI = 0.0;
-	double bestJ = 0.0;
+	float minCost = 99999.0;
+	float bestI = 0.0;
+	float bestJ = 0.0;
 
-	for (double i = -half_segment_length; i < half_segment_length; i += inc) {
-		for (double j = -half_segment_length; j < half_segment_length; j += inc) {
+	for (float i = -half_segment_length; i < half_segment_length; i += inc) {
+		for (float j = -half_segment_length; j < half_segment_length; j += inc) {
 
-			double cost = ED_reduction_interpolation_cost(org_frames, start_f, end_f, (Anchor) { i, j });
+			float cost = ED_reduction_interpolation_cost(org_frames, start_f, end_f, (Anchor) { i, j });
 			if (cost < minCost) {
 				minCost = cost;
 				bestI = i;
@@ -411,8 +375,8 @@ void ED_reduction_tweak_fcurve_anchors(Anchor *anchors, Frame *org_frames, Frame
 		anchors[i] = (Anchor) { reduced_frames[i].f, reduced_frames[i].v };
 
 	for (i = 1; i < n_reduced; i++) {
-		double start_f = reduced_frames[i - 1].f;
-		double end_f = reduced_frames[i].f;
+		float start_f = reduced_frames[i - 1].f;
+		float end_f = reduced_frames[i].f;
 
 		Anchor anchor = ED_reduction_pick_anchor_for_segment(org_frames, start_f, end_f);
 		anchors[i - 1].p2 = anchor.p1;

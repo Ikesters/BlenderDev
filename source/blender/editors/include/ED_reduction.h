@@ -39,11 +39,6 @@
  */
 
 bool   ED_reduction_val_in_array          (int val, int *arr, int size);
-void   ED_reduction_substract_vectors     (int npts, double out[npts], double *a, double *b);
-double ED_reduction_dot_vectors           (int npts, double *a, double *b);
-void   ED_reduction_copy_vector           (int npts, double out[npts], double *a);
-void   ED_reduction_scale_vector          (int npts, double out[npts], double s);
-double ED_reduction_length_of_vector      (int npts, double * a);
 int    ED_reduction_get_number_of_frames  (ListBase *anim_data);
 int    ED_reduction_get_number_of_fcurves (ListBase *anim_data);
 
@@ -54,7 +49,7 @@ int    ED_reduction_get_number_of_fcurves (ListBase *anim_data);
  * following functions create, fill, and delete this data structure.
  */
 
-typedef double ** NCurve;
+typedef float ** NCurve;
 
 NCurve ED_reduction_alloc_ndim_curve (int n_frames, int n_curves);
 void   ED_reduction_fill_ndim_curve  (NCurve ncurve, ListBase *anim_data, int n_frames);
@@ -69,9 +64,9 @@ void  ED_reduction_free_ndim_curve   (NCurve *ncurve);
  * (each pair of points in the path is referred to as a "chord").
  */
 
-void   ED_reduction_substract_vectors   (int npts, double *out, double *a, double *b);
-double ED_reduction_chord_to_frame_cost (double *p, double *q1, double *q2, int npts);
-double ED_reduction_segment_cost        (NCurve ncurve, int start_f, int end_f, int n_curves);
+void  ED_reduction_substract_vectors   (int npts, float *out, float *a, float *b);
+float ED_reduction_chord_to_frame_cost (float *p, float *q1, float *q2, int npts);
+float ED_reduction_segment_cost        (NCurve ncurve, int start_f, int end_f, int n_curves);
 
 
 /* Reduction Algorithm ---------------------------------------------------------------------------------------------- */
@@ -126,18 +121,18 @@ void ED_reduction_n_stoptable                 (int npts, int npts_sq, int n_stop
  */
 
 typedef struct Frame {
-	double f;
-	double v;
+	float f;
+	float v;
 } Frame;
 
 typedef struct Anchor {
-	double p1;
-	double p2;
+	float p1;
+	float p2;
 } Anchor;
 
-double ED_reduction_interpolation_at        (double f, double start_f, double end_f, Anchor anchors);
-double ED_reduction_interpolation_cost      (Frame *org_frames, double start_f, double end_f, Anchor anchors);
-Anchor ED_reduction_pick_anchor_for_segment (Frame *org_frames, double start_f, double end_f);
+float  ED_reduction_interpolation_at        (float f, float start_f, float end_f, Anchor anchors);
+float  ED_reduction_interpolation_cost      (Frame *org_frames, float start_f, float end_f, Anchor anchors);
+Anchor ED_reduction_pick_anchor_for_segment (Frame *org_frames, float start_f, float end_f);
 void   ED_reduction_tweak_fcurve_anchors    (Anchor *anchors, Frame *org_frames, Frame *reduced_frames, int n_reduced);
 
 
