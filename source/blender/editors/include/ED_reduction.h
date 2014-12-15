@@ -50,9 +50,9 @@ int    ED_reduction_get_number_of_frames  (ListBase *anim_data);
 
 typedef float **NPoseArr;
 
-void ED_reduction_init_ndim_pose_arr(NPoseArr *n_pose_arr, int n_frames, int n_curves);
-void ED_reduction_fill_ndim_pose_arr(NPoseArr *n_pose_arr, ListBase *anim_data, int n_frames);
-void ED_reduction_free_ndim_pose_arr(NPoseArr *n_pose_arr, int n_frames);
+void ED_reduction_init_ndim_pose_arr (NPoseArr *n_pose_arr, int n_frames, int n_curves);
+void ED_reduction_fill_ndim_pose_arr (NPoseArr *n_pose_arr, ListBase *anim_data, int n_frames);
+void ED_reduction_free_ndim_pose_arr (NPoseArr *n_pose_arr, int n_frames);
 
 
 /* Cost Analysis ---------------------------------------------------------------------------------------------------- */
@@ -63,9 +63,8 @@ void ED_reduction_free_ndim_pose_arr(NPoseArr *n_pose_arr, int n_frames);
  * (each pair of points in the path is referred to as a "chord").
  */
 
-void  ED_reduction_substract_vectors   (int npts, float *out, float *a, float *b);
-float ED_reduction_chord_to_frame_cost (float *p, float *q1, float *q2, int npts);
-float ED_reduction_segment_cost        (NPoseArr *n_pose_arr, int start_f, int end_f, int n_curves);
+float ED_reduction_line_to_point_dist (float *p, float *q1, float *q2, const int npts);
+float ED_reduction_segment_cost       (NPoseArr *n_pose_arr, int start_f, int end_f, int n_curves);
 
 
 /* Reduction Algorithm ---------------------------------------------------------------------------------------------- */

@@ -84,7 +84,6 @@ bool ED_reduction_val_in_array(int val, int *arr, int size)
 {
 	int i;
 
-
 	for (i = 0; i < size; i++) {
 		if (arr[i] == val)
 			return true;
@@ -159,44 +158,41 @@ void ED_reduction_free_ndim_pose_arr(NPoseArr *n_pose_arr, int n_frames)
  * (each pair of points in the path is referred to as a "chord").
  */
 
-float ED_reduction_chord_to_frame_cost(float *p, float *q1, float *q2, int npts)
+float ED_reduction_line_to_point_dist(float *p, float *q1, float *q2, const int npts)
 {
-	float distPoint[npts];
-	float distLine[npts]; 
-	float maxDist[npts];
+	float q_p1[npts], q2_q1[npts], p_q1q2[npts];
 	float t, numer, denom;
 
-	sub_vn_vnvn(distPoint, p, q1, npts);
-	sub_vn_vnvn(distLine, q2, q1, npts);
+	sub_vn_vnvn(q_p1, p, q1, npts);
+	sub_vn_vnvn(q2_q1, q2, q1, npts);
 
-	numer = dot_vn_vn(distPoint, distLine, npts);
-	denom = dot_vn_vn( distLine, distLine, npts);
+	numer = dot_vn_vn(q_p1, q2_q1, npts);
+	denom = dot_vn_vn(q2_q1, q2_q1, npts);
 	if (denom != 0) {
 		t = numer / denom;
 	} else {
 		t = numer;
 	}
 
-	mul_vn_fl(distLine, npts, t);
-	sub_vn_vnvn(maxDist, distPoint, distLine, npts);
+	mul_vn_fl(q2_q1, npts, t);
+	sub_vn_vnvn(p_q1q2, q_p1, q2_q1, npts);
 
-	return sqrt(len_squared_vn(maxDist, npts));
+	return sqrt(len_squared_vn(p_q1q2, npts));
 }
 
 float ED_reduction_segment_cost(NPoseArr *n_pose_arr, int start_f, int end_f, int n_curves)
 {
-	float maxDist = 0;
-	float dist;
+	float max_dist, dist;
 	int i;
 
+	max_dist = 0;
 	for (i = start_f; i < end_f; i++) {
-		dist = ED_reduction_chord_to_frame_cost((*n_pose_arr)[i], (*n_pose_arr)[start_f], (*n_pose_arr)[end_f], n_curves);
+		dist = ED_reduction_line_to_point_dist((*n_pose_arr)[i], (*n_pose_arr)[start_f], (*n_pose_arr)[end_f], n_curves);
 		
-		if (dist > maxDist)
-			maxDist = dist;
+		if (dist > max_dist)
+			max_dist = dist;
 	}
-
-	return maxDist;
+	return max_dist;
 }
 
 /* Reduction Algorithm ---------------------------------------------------------------------------------------------- */
@@ -294,7 +290,7 @@ void ED_reduction_zero_stoptable(int npts, int npts_sq, NStop table[npts_sq], NP
 void ED_reduction_n_stoptable(int npts, int npts_sq, int n_stops, int n, NStop n_table[npts_sq], NStop z_table[npts_sq])
 {
 	NStop tmp_table[npts_sq];
-	int i, j, k, indexIJ, indexIK, indexKJ;
+	int i, j, k, ij, ik, kj;
 	float minCost, cost;
 
 	if (n_table[npts - 1].n == n_stops)
@@ -305,23 +301,23 @@ void ED_reduction_n_stoptable(int npts, int npts_sq, int n_stops, int n, NStop n
 
 	for (i = 0; i < npts; i++) {
 		for (j = i + n + 1; j < npts; j++) {
-			indexIJ = i * npts + j;
+			ij = i * npts + j;
 
 			/* Find the least cost path between i and j */
 			minCost = 99999;
 			for (k = i + 1; k < j; k++) {
-				indexIK = i * npts + k;
-				indexKJ = k * npts + j;
-				cost = max_ff(n_table[indexIK].cost, z_table[indexKJ].cost);
+				ik = i * npts + k;
+				kj = k * npts + j;
+				cost = max_ff(n_table[ik].cost, z_table[kj].cost);
 
 				if (cost < minCost) {
 					minCost = cost;	
-					tmp_table[indexIJ].cost = cost;
-					tmp_table[indexIJ].n = n_table[indexIK].n + 1;
-					tmp_table[indexIJ].path = malloc(tmp_table[indexIJ].n * sizeof(int));  
-					ED_reduction_copy_stoptable_path_and_add(tmp_table[indexIJ].path,
-															 n_table[indexIK].path,
-															 n_table[indexIK].n, j);
+					tmp_table[ij].cost = cost;
+					tmp_table[ij].n = n_table[ik].n + 1;
+					tmp_table[ij].path = malloc(tmp_table[ij].n * sizeof(int));  
+					ED_reduction_copy_stoptable_path_and_add(tmp_table[ij].path,
+															 n_table[ik].path,
+															 n_table[ik].n, j);
 				}
 			}
 		}
@@ -357,27 +353,29 @@ float ED_reduction_interpolation_at(float f, float start_f, float end_f, Anchor 
                pow(t ,3)                 * end_f;
 }
 
-float ED_reduction_interpolation_cost(Frame *org_frames, float start_f, float end_f, Anchor anchors) {
-	float i, originalV, interpedV, maxCost, cost;
+float ED_reduction_interpolation_cost(Frame *org_frames, float start_f, float end_f, Anchor anchors)
+{
+	float i, original_v, interped_v, cost, cost_max;
 	int index;
 
-	maxCost = 0;
+	cost_max = 0;
 	index = 0;
 	for (i = start_f; i < end_f; i += 1.0) {
-		originalV = org_frames[index].v;
-		interpedV = ED_reduction_interpolation_at(i, start_f, end_f, anchors);
+		original_v = org_frames[index].v;
+		interped_v = ED_reduction_interpolation_at(i, start_f, end_f, anchors);
 
-		cost = fabs(originalV - interpedV);
-		if (cost > maxCost)
-			maxCost = cost;
+		cost = fabs(original_v - interped_v);
+		if (cost > cost_max)
+			cost_max = cost;
 
 		index ++;
 	}
 
-	return maxCost;
+	return cost_max;
 }
 
-Anchor ED_reduction_pick_anchor_for_segment(Frame *org_frames, float start_f, float end_f) {
+Anchor ED_reduction_pick_anchor_for_segment(Frame *org_frames, float start_f, float end_f)
+{
 	float half_segment_length, inc;
 	float i, j, bestI, bestJ, minCost, cost;
 
