@@ -48,11 +48,11 @@ int    ED_reduction_get_number_of_frames  (ListBase *anim_data);
  * following functions create, fill, and delete this data structure.
  */
 
-typedef float ** NCurve;
+typedef float **NPoseArr;
 
-NCurve ED_reduction_alloc_ndim_curve (int n_frames, int n_curves);
-void   ED_reduction_fill_ndim_curve  (NCurve ncurve, ListBase *anim_data, int n_frames);
-void  ED_reduction_free_ndim_curve   (NCurve *ncurve);
+void ED_reduction_init_ndim_pose_arr(NPoseArr *n_pose_arr, int n_frames, int n_curves);
+void ED_reduction_fill_ndim_pose_arr(NPoseArr *n_pose_arr, ListBase *anim_data, int n_frames);
+void ED_reduction_free_ndim_pose_arr(NPoseArr *n_pose_arr, int n_frames);
 
 
 /* Cost Analysis ---------------------------------------------------------------------------------------------------- */
@@ -65,7 +65,7 @@ void  ED_reduction_free_ndim_curve   (NCurve *ncurve);
 
 void  ED_reduction_substract_vectors   (int npts, float *out, float *a, float *b);
 float ED_reduction_chord_to_frame_cost (float *p, float *q1, float *q2, int npts);
-float ED_reduction_segment_cost        (NCurve ncurve, int start_f, int end_f, int n_curves);
+float ED_reduction_segment_cost        (NPoseArr *n_pose_arr, int start_f, int end_f, int n_curves);
 
 
 /* Reduction Algorithm ---------------------------------------------------------------------------------------------- */
@@ -104,7 +104,7 @@ void ED_reduction_copy_stoptable_path_and_add (int *tgt, int *src, int npts, int
 void ED_reduction_init_stoptable              (int npts_sq, NStop *table);
 void ED_reduction_copy_stoptable              (int npts_sq, NStop *a, NStop *b);
 void ED_reduction_delete_stoptable            (int npts_sq, NStop *table);
-void ED_reduction_zero_stoptable              (int npts, int npts_sq, NStop *table, NCurve ncurve, int n_curves);
+void ED_reduction_zero_stoptable              (int npts, int npts_sq, NStop *table, NPoseArr *n_pose_arr, int n_curves);
 void ED_reduction_n_stoptable                 (int npts, int npts_sq, int n_stops, int n, NStop *n_table, NStop *z_table);
 
 

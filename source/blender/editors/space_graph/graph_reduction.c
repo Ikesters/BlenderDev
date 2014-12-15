@@ -84,6 +84,7 @@ bool ED_reduction_val_in_array(int val, int *arr, int size)
 {
 	int i;
 
+
 	for (i = 0; i < size; i++) {
 		if (arr[i] == val)
 			return true;
@@ -111,21 +112,18 @@ int ED_reduction_get_number_of_frames(ListBase *anim_data)
  * following functions create, fill, and delete this data structure.
  */
 
-NCurve ED_reduction_alloc_ndim_curve(int n_frames, int n_curves)
+void ED_reduction_init_ndim_pose_arr(NPoseArr *n_pose_arr, int n_frames, int n_curves)
 {
-	NCurve ncurve = malloc (n_frames * sizeof (float *));
-	for (int i = 0; i < n_frames; i++) {
-		ncurve[i] = malloc (n_curves * sizeof (float));
-	}
+	int i;
 
-	return ncurve;
+	(*n_pose_arr) = MEM_callocN(sizeof(float *) * n_frames, "IcuNPoseArr_main");
+	for (i = 0; i < n_frames; i++)
+		(*n_pose_arr)[i] = MEM_callocN(sizeof(float) * n_curves, "IcuNPoseArr_row");
 }
 
-void ED_reduction_free_ndim_curve(NCurve *ncurve) {
-	free(ncurve);
-}
 
-void ED_reduction_fill_ndim_curve(NCurve ncurve, ListBase *anim_data, int n_frames)
+
+void ED_reduction_fill_ndim_pose_arr(NPoseArr *n_pose_arr, ListBase *anim_data, int n_frames)
 { 
 	bAnimListElem *ale;
 	BezTriple *bezt;
@@ -133,14 +131,23 @@ void ED_reduction_fill_ndim_curve(NCurve ncurve, ListBase *anim_data, int n_fram
 	int i, j;
 	
 	for (j = 0; j < n_frames; j++)
-		ncurve[j][0] = (float) j;
+		(*n_pose_arr)[j][0] = (float) j; /* ??? Is parsing j to float this way ok with all supported compilers? */
 
 	for (i = 0, ale = anim_data->first; ale; i++, ale = ale->next) {
 		fcu = ale->key_data;
 
 		for (j = 0, bezt = fcu->bezt; j < fcu->totvert; j++, bezt++)
-			ncurve[j][i + 1] = bezt->vec[1][1];
+			(*n_pose_arr)[j][i + 1] = bezt->vec[1][1];
 	}
+}
+
+void ED_reduction_free_ndim_pose_arr(NPoseArr *n_pose_arr, int n_frames)
+{
+	int i;
+
+	for (i = 0; i < n_frames; i++)
+		MEM_freeN((*n_pose_arr)[i]);
+	MEM_freeN((*n_pose_arr));
 }
 
 
@@ -176,14 +183,14 @@ float ED_reduction_chord_to_frame_cost(float *p, float *q1, float *q2, int npts)
 	return sqrt(len_squared_vn(maxDist, npts));
 }
 
-float ED_reduction_segment_cost(NCurve ncurve, int start_f, int end_f, int n_curves)
+float ED_reduction_segment_cost(NPoseArr *n_pose_arr, int start_f, int end_f, int n_curves)
 {
 	float maxDist = 0;
 	float dist;
 	int i;
 
 	for (i = start_f; i < end_f; i++) {
-		dist = ED_reduction_chord_to_frame_cost(ncurve[i], ncurve[start_f], ncurve[end_f], n_curves);
+		dist = ED_reduction_chord_to_frame_cost((*n_pose_arr)[i], (*n_pose_arr)[start_f], (*n_pose_arr)[end_f], n_curves);
 		
 		if (dist > maxDist)
 			maxDist = dist;
@@ -266,7 +273,7 @@ void ED_reduction_delete_stoptable(int npts_sq, NStop table[npts_sq])
 	}
 }
 
-void ED_reduction_zero_stoptable(int npts, int npts_sq, NStop table[npts_sq], NCurve ncurve, int n_curves)
+void ED_reduction_zero_stoptable(int npts, int npts_sq, NStop table[npts_sq], NPoseArr *n_pose_arr, int n_curves)
 {
 	int i, j, index;
 
@@ -274,7 +281,7 @@ void ED_reduction_zero_stoptable(int npts, int npts_sq, NStop table[npts_sq], NC
 		for (j = i + 1; j < npts; j++) {
 			
 			index = i * npts + j;
-			table[index].cost = ED_reduction_segment_cost(ncurve, i, j, n_curves);
+			table[index].cost = ED_reduction_segment_cost(n_pose_arr, i, j, n_curves);
 			table[index].n = 2;
 
 			table[index].path = malloc(table[index].n * sizeof(int));  
@@ -430,22 +437,22 @@ int *ED_reduction_pick_best_frames(ListBase *anim_data, int n_stops)
 {
 	int n_curves, n_frames, n_frames_sq;
 	int *frameIndices;
-	NCurve ncurve;
+	NPoseArr n_pose_arr;
 
 	n_curves = BLI_countlist(anim_data) + 1;
 	n_frames = ED_reduction_get_number_of_frames(anim_data);
 	n_frames_sq = n_frames * n_frames;
 
 	/* Construct n-dimensional curve */
-	ncurve = ED_reduction_alloc_ndim_curve(n_frames, n_curves);
-	ED_reduction_fill_ndim_curve(ncurve, anim_data, n_frames);
+	ED_reduction_init_ndim_pose_arr(&n_pose_arr, n_frames, n_curves);
+	ED_reduction_fill_ndim_pose_arr(&n_pose_arr, anim_data, n_frames);
 
 	/* Build dynamic-programming tables */
 	NStop z_table[n_frames_sq]; // TODO fix this
 	NStop n_table[n_frames_sq];
 	ED_reduction_init_stoptable(n_frames_sq, z_table);
 	ED_reduction_init_stoptable(n_frames_sq, n_table);
-	ED_reduction_zero_stoptable(n_frames, n_frames_sq, z_table, ncurve, n_curves);
+	ED_reduction_zero_stoptable(n_frames, n_frames_sq, z_table, &n_pose_arr, n_curves);
 	ED_reduction_copy_stoptable(n_frames_sq, z_table, n_table);
 
 	/* Recursively find the best point-path the first and last frame. */
@@ -458,7 +465,7 @@ int *ED_reduction_pick_best_frames(ListBase *anim_data, int n_stops)
 	/* Clean up */
 	ED_reduction_delete_stoptable(n_frames_sq, z_table);
 	ED_reduction_delete_stoptable(n_frames_sq, n_table);
-	ED_reduction_free_ndim_curve(&ncurve);
+	ED_reduction_free_ndim_pose_arr(&n_pose_arr, n_frames);
 	
 	return frameIndices;
 }
