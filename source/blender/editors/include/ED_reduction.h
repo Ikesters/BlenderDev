@@ -43,17 +43,19 @@ bool   ED_reduction_val_in_array          (int val, int *arr, int size);
 int    ED_reduction_get_number_of_frames  (ListBase *anim_data);
 
 
-/* N-dimensional Curve Construction --------------------------------------------------------------------------------- */
+/* Pose Array Construction ------------------------------------------------------------------------------------------ */
 /* 
  * Instead of running a cost function on n one-dimensional f-curves, we choose to use 1 n-dimensional curve. The
- * following functions create, fill, and delete this data structure.
+ * following functions create, fill, and delete this data structure. This n-dimensional curve can be imagined as an
+ * array of poses, where a pose is defined as the current value for each degree of freedeom (the value for each 
+ * motion curve).
  */
 
 typedef float **NPoseArr;
 
-void ED_reduction_init_ndim_pose_arr (NPoseArr *n_pose_arr, int n_frames, int n_curves);
-void ED_reduction_fill_ndim_pose_arr (NPoseArr *n_pose_arr, ListBase *anim_data, int n_frames);
-void ED_reduction_free_ndim_pose_arr (NPoseArr *n_pose_arr, int n_frames);
+void ED_reduction_init_pose_arr (NPoseArr *n_pose_arr, int n_frames, int n_curves);
+void ED_reduction_fill_pose_arr (NPoseArr *n_pose_arr, ListBase *anim_data, int n_frames);
+void ED_reduction_free_pose_arr (NPoseArr *n_pose_arr, int n_frames);
 
 
 /* Cost Analysis ---------------------------------------------------------------------------------------------------- */
@@ -130,10 +132,10 @@ typedef struct Anchor {
 	float p2;
 } Anchor;
 
-float  ED_reduction_interpolation_at        (float f, float start_f, float end_f, Anchor anchors);
-float  ED_reduction_interpolation_cost      (Frame *org_frames, float start_f, float end_f, Anchor anchors);
-Anchor ED_reduction_pick_anchor_for_segment (Frame *org_frames, float start_f, float end_f);
-void   ED_reduction_tweak_fcurve_anchors    (Anchor *anchors, Frame *org_frames, Frame *reduced_frames, int n_reduced);
+float  ED_reduction_interpolation_at       (float f, float start_f, float end_f, Anchor anchors);
+float  ED_reduction_interpolation_cost     (Frame *org_frames, float start_f, float end_f, Anchor anchors);
+Anchor ED_reduction_pick_anchor_for_segment(Frame *org_frames, float start_f, float end_f);
+void   ED_reduction_tweak_fcurve_anchors   (FCurve * fcu, Frame *org_frames, Frame *reduced_frames);
 
 
 /* Reduction -------------------------------------------------------------------------------------------------------- */
@@ -148,7 +150,7 @@ void   ED_reduction_tweak_fcurve_anchors    (Anchor *anchors, Frame *org_frames,
  */
 
 void ED_reduction_pick_best_frames (NPoseArr n_pose_arr, int n_keys, int n_frames, int n_curves, int *indices);
-void ED_reduction_reduce_fcurves   (ListBase *anim_data, int *frameIndices, int n_keys);
+void ED_reduction_reduce_fcurve    (FCurve * fcu, int *indices, int n_frames, int n_keys);
 
 
 /* Registration ----------------------------------------------------------------------------------------------------- */

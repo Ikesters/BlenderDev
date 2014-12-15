@@ -115,13 +115,15 @@ int ED_reduction_get_number_of_frames(ListBase *anim_data)
 }
 
 
-/* N-dimensional Curve Construction --------------------------------------------------------------------------------- */
+/* Pose Array Construction ------------------------------------------------------------------------------------------ */
 /* 
  * Instead of running a cost function on n one-dimensional f-curves, we choose to use 1 n-dimensional curve. The
- * following functions create, fill, and delete this data structure.
+ * following functions create, fill, and delete this data structure. This n-dimensional curve can be imagined as an
+ * array of poses, where a pose is defined as the current value for each degree of freedeom (the value for each 
+ * motion curve).
  */
 
-void ED_reduction_init_ndim_pose_arr(NPoseArr *n_pose_arr, int n_frames, int n_curves)
+void ED_reduction_init_pose_arr(NPoseArr *n_pose_arr, int n_frames, int n_curves)
 {
 	int i;
 
@@ -132,7 +134,7 @@ void ED_reduction_init_ndim_pose_arr(NPoseArr *n_pose_arr, int n_frames, int n_c
 
 
 
-void ED_reduction_fill_ndim_pose_arr(NPoseArr *n_pose_arr, ListBase *anim_data, int n_frames)
+void ED_reduction_fill_pose_arr(NPoseArr *n_pose_arr, ListBase *anim_data, int n_frames)
 { 
 	bAnimListElem *ale;
 	BezTriple *bezt;
@@ -150,7 +152,7 @@ void ED_reduction_fill_ndim_pose_arr(NPoseArr *n_pose_arr, ListBase *anim_data, 
 	}
 }
 
-void ED_reduction_free_ndim_pose_arr(NPoseArr *n_pose_arr, int n_frames)
+void ED_reduction_free_pose_arr(NPoseArr *n_pose_arr, int n_frames)
 {
 	int i;
 
@@ -266,12 +268,13 @@ void ED_reduction_delete_stoptable(StopTable *table, int n_frames)
 void ED_reduction_zero_stoptable(StopTable table, NPoseArr *n_pose_arr, int n_frames, int n_curves)
 {
 	int i, j, index;
+	float cost;
 
 	for (i = 0; i < n_frames - 1; i++) {
 		for (j = i + 1; j < n_frames; j++) {
 
 			index = i * n_frames + j;
-			float cost = ED_reduction_segment_cost(n_pose_arr, i, j, n_curves);
+			cost = ED_reduction_segment_cost(n_pose_arr, i, j, n_curves);
 			table[index].cost = cost;
 			table[index].n = 2;
 			table[index].path[0] = i;
@@ -387,21 +390,22 @@ Anchor ED_reduction_pick_anchor_for_segment(Frame *org_frames, float start_f, fl
 	return (Anchor) { bestI, bestJ };
 }
 
-void ED_reduction_tweak_fcurve_anchors(Anchor *anchors, Frame *org_frames, Frame *reduced_frames, int n_reduced)
+void ED_reduction_tweak_fcurve_anchors(FCurve * fcu, Frame *org_frames, Frame *reduced_frames)
 {
 	int i;
 	float start_f, end_f;
+	BezTriple *bezLeft;
+	BezTriple *bezRight;
 
-	for (i = 0; i < n_reduced; i++)
-		anchors[i] = (Anchor) { reduced_frames[i].f, reduced_frames[i].v };
-
-	for (i = 1; i < n_reduced; i++) {
+	for (i = 1; i < fcu->totvert; i++) {
 		start_f = reduced_frames[i - 1].f;
 		end_f = reduced_frames[i].f;
-
 		Anchor anchor = ED_reduction_pick_anchor_for_segment(org_frames, start_f, end_f);
-		anchors[i - 1].p2 = anchor.p1;
-		anchors[i    ].p1 = anchor.p2;
+		
+		bezLeft  = (fcu->bezt + i - 1);
+		bezRight = (fcu->bezt + i);
+		bezRight->vec[0][1] = anchor.p1;
+		bezLeft->vec[2][1] = anchor.p2;
 	}
 }
 
@@ -441,52 +445,42 @@ void ED_reduction_pick_best_frames(NPoseArr n_pose_arr, int n_keys, int n_frames
 	ED_reduction_delete_stoptable(&z_table, n_frames);
 	ED_reduction_delete_stoptable(&n_table, n_frames);
 	ED_reduction_delete_stoptable(&n_tableBuffer, n_frames);
-	ED_reduction_free_ndim_pose_arr(&n_pose_arr, n_frames);
+	ED_reduction_free_pose_arr(&n_pose_arr, n_frames);
 }
 
-void ED_reduction_reduce_fcurves(ListBase *anim_data, int *frameIndices, int n_keys)
+void ED_reduction_reduce_fcurve(FCurve * fcu, int *indices, int n_frames, int n_keys)
 {
-	int n_frames = ED_reduction_get_number_of_frames(anim_data);
-	bAnimListElem *ale;
 	BezTriple *bezt;
-	FCurve * fcu;
 	int i, index;
-	Frame reduced_frames[n_keys];
-	Frame org_frames[n_frames];
-	
 
+	Frame tmpFrame;
+	Frame *org_frames = MEM_mallocN(n_frames * sizeof(Frame), "FrameCache");
+	Frame *reduced_frames = MEM_mallocN(n_keys * sizeof(Frame), "FrameCache");
 
+	/* Cache frame information */
+	index = 0;
+	for (i = 0, bezt = fcu->bezt; i < n_frames; i++, bezt++) {
+		tmpFrame.f = bezt->vec[1][0];
+		tmpFrame.v = bezt->vec[1][1];
+		org_frames[i] = tmpFrame;
 
-	for (ale = anim_data->first; ale; ale = ale->next) {
-		fcu = ale->key_data;
-
-		/* Cache frame information */
-		index = 0;
-		for (i = 0, bezt = fcu->bezt; i < n_frames; i++, bezt++) {
-			org_frames[i] = (Frame) { bezt->vec[1][0], bezt->vec[1][1] };
-			if (ED_reduction_val_in_array(i, frameIndices, n_keys)) {
-				reduced_frames[index] = (Frame) { bezt->vec[1][0], bezt->vec[1][1] };
-				index ++;
-			}
+		if (ED_reduction_val_in_array(i, indices, n_keys)) {
+			reduced_frames[index] = tmpFrame;
+			index ++;
 		}
-
-		/* Delete all the existing keyframes, and then rebuild based on the cached keyframe data */
-		clear_fcurve_keys(fcu);
-		for (i = 0; i < n_keys; i++)
-			insert_vert_fcurve(fcu, reduced_frames[i].f, reduced_frames[i].v, 1);
-		calchandles_fcurve(fcu);
-
-		/* Tweaking the bezier handles of the new keyframes to best repliciate the original data */
-		Anchor anchors[n_keys]; // TODO
-		ED_reduction_tweak_fcurve_anchors(anchors, org_frames, reduced_frames, n_keys);
-		for (i = 0, bezt = fcu->bezt; i < fcu->totvert; i++, bezt++) {
-			if (i != 0)
-				bezt->vec[0][1] = anchors[i].p1;
-			if (i != n_keys - 1)
-				bezt->vec[2][1] = anchors[i].p2;
-		}
-
-		ale->update |= ANIM_UPDATE_DEFAULT;
 	}
+
+	/* Delete all the existing keyframes, adding only the best ones back in */
+	clear_fcurve_keys(fcu);
+	for (i = 0; i < n_keys; i++)
+		insert_vert_fcurve(fcu, reduced_frames[i].f, reduced_frames[i].v, 1);
+	calchandles_fcurve(fcu);
+
+	/* Tweaking the bezier handles of the new keyframes to best repliciate the cached data */
+	ED_reduction_tweak_fcurve_anchors(fcu, org_frames, reduced_frames);
+
+	/* Clean up */
+	MEM_freeN(org_frames);
+	MEM_freeN(reduced_frames);
 }
 

@@ -1024,27 +1024,35 @@ void GRAPH_OT_clean(wmOperatorType *ot)
 static void reduce_keyframes(bAnimContext *ac, int n_keys)
 {   
 	ListBase anim_data = {NULL, NULL};
+	bAnimListElem *ale;
+
 	int filter;
+
+	int n_frames, n_curves;
 	NPoseArr n_pose_arr;
-	int n_frames, n_frames_sq, n_curves;
 	int *indices;
 	
 	/* filter data */
 	filter = (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_CURVE_VISIBLE | ANIMFILTER_FOREDIT | ANIMFILTER_NODUPLIS | ANIMFILTER_SEL);
 	ANIM_animdata_filter(ac, &anim_data, filter, ac->data, ac->datatype);
 
-	/* Build an array of poses, where a pose is an array that contains the values of the curves. */
+	/* Cache data into a pose array, refer to the pose array construction section in ED_keyframe_reduction */
 	n_frames = ED_reduction_get_number_of_frames(&anim_data);
 	n_curves = BLI_countlist(&anim_data) + 1;
-	ED_reduction_init_ndim_pose_arr(&n_pose_arr, n_frames, n_curves);
-	ED_reduction_fill_ndim_pose_arr(&n_pose_arr, &anim_data, n_frames);
+	ED_reduction_init_pose_arr(&n_pose_arr, n_frames, n_curves);
+	ED_reduction_fill_pose_arr(&n_pose_arr, &anim_data, n_frames);
 
 	/* Pick the best placement of keyframes, and then reconstruct each curve based on this placement */
 	indices = MEM_mallocN(sizeof(int) * n_keys, "indices");
 	ED_reduction_pick_best_frames(n_pose_arr, n_keys, n_frames, n_curves, indices);
-	ED_reduction_reduce_fcurves(&anim_data, indices, n_keys);
-	MEM_freeN(indices);
+	
+	for (ale = anim_data.first; ale; ale = ale->next) {
+		ED_reduction_reduce_fcurve(ale->key_data, indices, n_frames, n_keys);
+		ale->update |= ANIM_UPDATE_DEFAULT;
+	}
 
+	/* Clean up */
+	MEM_freeN(indices);
 	ANIM_animdata_update(ac, &anim_data);
 	ANIM_animdata_freelist(&anim_data);
 }
