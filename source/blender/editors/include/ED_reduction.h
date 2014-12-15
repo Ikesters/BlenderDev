@@ -100,11 +100,13 @@ typedef struct NStop {
 } NStop;
 typedef NStop *StopTable;
 
-void ED_reduction_init_stoptable              (StopTable *table, int npts_sq, int n_stops);
-void ED_reduction_copy_stoptable              (int npts_sq, StopTable a, StopTable b);
-void ED_reduction_delete_stoptable            (int npts_sq, StopTable *table);
-void ED_reduction_zero_stoptable              (int npts, StopTable table, NPoseArr *n_pose_arr, int n_curves);
-void ED_reduction_n_stoptable                 (int npts, int npts_sq, int n_stops, int n, StopTable n_table, StopTable n_tableBuffer, StopTable z_table);
+void ED_reduction_init_stoptable              (StopTable *table, int n_frames, int n_keys);
+void ED_reduction_copy_stoptable              (StopTable a, StopTable b, int n_frames);
+void ED_reduction_delete_stoptable            (StopTable *table, int n_frames);
+void ED_reduction_zero_stoptable              (StopTable table, NPoseArr *n_pose_arr, int n_frames, int n_curves);
+void ED_reduction_n_stoptable                 (int n_frames, int n_keys, int n, StopTable n_table,
+																				StopTable n_tableBuffer,
+																				StopTable z_table);
 
 
 /* Bezier Handle Tweaking ------------------------------------------------------------------------------------------- */
@@ -145,8 +147,8 @@ void   ED_reduction_tweak_fcurve_anchors    (Anchor *anchors, Frame *org_frames,
  * curve to those indicated by the given indices, and then runs the bezier handle tweaking algorithm.
  */
 
-int *ED_reduction_pick_best_frames (ListBase *anim_data, int n_stops);
-void ED_reduction_reduce_fcurves   (ListBase *anim_data, int *frameIndices, int n_stops);
+void ED_reduction_pick_best_frames (NPoseArr n_pose_arr, int n_keys, int n_frames, int n_curves, int *indices);
+void ED_reduction_reduce_fcurves   (ListBase *anim_data, int *frameIndices, int n_keys);
 
 
 /* Registration ----------------------------------------------------------------------------------------------------- */
