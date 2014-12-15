@@ -100,11 +100,11 @@ typedef struct NStop {
 
 void ED_reduction_copy_stoptable_path         (int *tgt, int *src, int npts);
 void ED_reduction_copy_stoptable_path_and_add (int *tgt, int *src, int npts, int v);
-void ED_reduction_init_stoptable              (int npts_sq, NStop *table);
+void ED_reduction_init_stoptable              (NStop **table, int npts_sq, int n_stops);
 void ED_reduction_copy_stoptable              (int npts_sq, NStop *a, NStop *b);
 void ED_reduction_delete_stoptable            (int npts_sq, NStop *table);
-void ED_reduction_zero_stoptable              (int npts, int npts_sq, NStop *table, NPoseArr *n_pose_arr, int n_curves);
-void ED_reduction_n_stoptable                 (int npts, int npts_sq, int n_stops, int n, NStop *n_table, NStop *z_table);
+void ED_reduction_zero_stoptable              (int npts, NStop *table, NPoseArr *n_pose_arr, int n_curves);
+void ED_reduction_n_stoptable                 (int npts, int npts_sq, int n_stops, int n, NStop *n_table, NStop *n_tableBuffer, NStop *z_table);
 
 
 /* Bezier Handle Tweaking ------------------------------------------------------------------------------------------- */

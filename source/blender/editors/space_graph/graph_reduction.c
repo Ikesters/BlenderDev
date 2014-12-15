@@ -115,9 +115,9 @@ void ED_reduction_init_ndim_pose_arr(NPoseArr *n_pose_arr, int n_frames, int n_c
 {
 	int i;
 
-	(*n_pose_arr) = MEM_callocN(sizeof(float *) * n_frames, "IcuNPoseArr_main");
+	(*n_pose_arr) = MEM_callocN(sizeof(float *) * n_frames, "NPoseArr_new");
 	for (i = 0; i < n_frames; i++)
-		(*n_pose_arr)[i] = MEM_callocN(sizeof(float) * n_curves, "IcuNPoseArr_row");
+		(*n_pose_arr)[i] = MEM_callocN(sizeof(float) * n_curves, "NPoseArr_row");
 }
 
 
@@ -235,69 +235,84 @@ void ED_reduction_copy_stoptable_path_and_add(int *tgt, int *src, int npts, int 
 	tgt[npts] = v;
 }
 
-void ED_reduction_init_stoptable(int npts_sq, NStop table[npts_sq])
+void ED_reduction_init_stoptable(NStop **table, int npts_sq, int n_stops)
 {
 	int i;
 
+	*table = MEM_mallocN(sizeof(NStop) * npts_sq, "NStop_table_new");
 	for (i = 0; i < npts_sq; i++) {
-		table[i].cost = 99999;
-		table[i].n = 0;
-	} 
+		// printf("i=%d\n", i);
+		(*table)[i].cost = 99999;
+		(*table)[i].n = 0;
+		(*table)[i].path = MEM_mallocN(sizeof(int) * n_stops, "NStop_path_new");
+	}
 }
 
-void ED_reduction_copy_stoptable(int npts_sq, NStop a[npts_sq], NStop b[npts_sq])
+void ED_reduction_copy_stoptable(int npts_sq, NStop *a, NStop *b)
 {
+	printf("COPY STOP\n");
 	int i;
 
 	for (i = 0; i < npts_sq; i++) {
 		b[i].cost = a[i].cost;
 		b[i].n = a[i].n;
 
-		b[i].path = malloc(b[i].n * sizeof(int)); 
+		// b[i].path = MEM_callocN(sizeof(int) * b[i].n, "NStop_path_copy"); 
 		ED_reduction_copy_stoptable_path(b[i].path, a[i].path, b[i].n);
 	}
+	printf("COPY STOP DONE\n");
 }
 
-void ED_reduction_delete_stoptable(int npts_sq, NStop table[npts_sq])
+void ED_reduction_delete_stoptable(int npts_sq, NStop *table)
 {
+	printf("FREEING STOP\n");
 	int i;
 
 	for (i = 0; i < npts_sq; i++) {
 		if (table[i].n > 0) {	
-			free(table[i].path);
+			MEM_freeN(table[i].path);
 		}
 	}
+	MEM_freeN(table);
+	printf("FREEING STOP DONE\n");
 }
 
-void ED_reduction_zero_stoptable(int npts, int npts_sq, NStop table[npts_sq], NPoseArr *n_pose_arr, int n_curves)
+void ED_reduction_zero_stoptable(int npts, NStop *table, NPoseArr *n_pose_arr, int n_curves)
 {
+	printf("Making zero-stoptable\n");
 	int i, j, index;
 
 	for (i = 0; i < npts - 1; i++) {
 		for (j = i + 1; j < npts; j++) {
 			
+			// printf("a\n");
 			index = i * npts + j;
-			table[index].cost = ED_reduction_segment_cost(n_pose_arr, i, j, n_curves);
+			// printf("a1, inex=%d\n", index);
+			float cost = ED_reduction_segment_cost(n_pose_arr, i, j, n_curves);
+			// printf("a1a\n");
+			table[index].cost = cost;
+			// printf("a2\n");
 			table[index].n = 2;
+			// printf("b\n");
 
-			table[index].path = malloc(table[index].n * sizeof(int));  
+			// table[index].path = MEM_callocN(sizeof(int) * table[index].n, "NStop_path_new");  
+			// printf("b1\n");
 			table[index].path[0] = i;
 			table[index].path[1] = j;
+			// printf("c\n");
 		}
 	}
+
+	printf("finished zero-stoptable\n");
 }
 
-void ED_reduction_n_stoptable(int npts, int npts_sq, int n_stops, int n, NStop n_table[npts_sq], NStop z_table[npts_sq])
+void ED_reduction_n_stoptable(int npts, int npts_sq, int n_stops, int n, NStop *n_table, NStop *n_tableBuffer, NStop *z_table)
 {
-	NStop tmp_table[npts_sq];
 	int i, j, k, ij, ik, kj;
 	float minCost, cost;
 
-	if (n_table[npts - 1].n == n_stops)
+	if (n_tableBuffer[npts - 1].n == n_stops)
 		return;
-
-	
-	ED_reduction_init_stoptable(npts_sq, tmp_table);
 
 	for (i = 0; i < npts; i++) {
 		for (j = i + n + 1; j < npts; j++) {
@@ -312,10 +327,10 @@ void ED_reduction_n_stoptable(int npts, int npts_sq, int n_stops, int n, NStop n
 
 				if (cost < minCost) {
 					minCost = cost;	
-					tmp_table[ij].cost = cost;
-					tmp_table[ij].n = n_table[ik].n + 1;
-					tmp_table[ij].path = malloc(tmp_table[ij].n * sizeof(int));  
-					ED_reduction_copy_stoptable_path_and_add(tmp_table[ij].path,
+					n_tableBuffer[ij].cost = cost;
+					n_tableBuffer[ij].n = n_table[ik].n + 1;
+					// n_tableBuffer[ij].path = MEM_callocN(sizeof(int) * n_tableBuffer[ij].n, "NStop_path_new");
+					ED_reduction_copy_stoptable_path_and_add(n_tableBuffer[ij].path,
 															 n_table[ik].path,
 															 n_table[ik].n, j);
 				}
@@ -323,9 +338,7 @@ void ED_reduction_n_stoptable(int npts, int npts_sq, int n_stops, int n, NStop n
 		}
 	}
 
-	ED_reduction_delete_stoptable(npts_sq, n_table);
-	ED_reduction_copy_stoptable(npts_sq, tmp_table, n_table);
-	ED_reduction_n_stoptable(npts, npts_sq, n_stops, n + 1, n_table, z_table);
+	ED_reduction_n_stoptable(npts, npts_sq, n_stops, n + 1, n_tableBuffer, n_table, z_table);
 }
 
 /* Bezier Handle Tweaking ------------------------------------------------------------------------------------------- */
@@ -436,6 +449,9 @@ int *ED_reduction_pick_best_frames(ListBase *anim_data, int n_stops)
 	int n_curves, n_frames, n_frames_sq;
 	int *frameIndices;
 	NPoseArr n_pose_arr;
+	NStop *z_table = NULL;
+	NStop *n_tableA = NULL;
+	NStop *n_tableB = NULL;
 
 	n_curves = BLI_countlist(anim_data) + 1;
 	n_frames = ED_reduction_get_number_of_frames(anim_data);
@@ -446,42 +462,50 @@ int *ED_reduction_pick_best_frames(ListBase *anim_data, int n_stops)
 	ED_reduction_fill_ndim_pose_arr(&n_pose_arr, anim_data, n_frames);
 
 	/* Build dynamic-programming tables */
-	NStop z_table[n_frames_sq]; // TODO fix this
-	NStop n_table[n_frames_sq];
-	ED_reduction_init_stoptable(n_frames_sq, z_table);
-	ED_reduction_init_stoptable(n_frames_sq, n_table);
-	ED_reduction_zero_stoptable(n_frames, n_frames_sq, z_table, &n_pose_arr, n_curves);
-	ED_reduction_copy_stoptable(n_frames_sq, z_table, n_table);
+	ED_reduction_init_stoptable(&z_table, n_frames_sq, n_stops);
+	ED_reduction_init_stoptable(&n_tableA, n_frames_sq, n_stops);
+	ED_reduction_init_stoptable(&n_tableB, n_frames_sq, n_stops);
+
+	printf("A\n");
+	ED_reduction_zero_stoptable(n_frames, z_table, &n_pose_arr, n_curves);
+	ED_reduction_copy_stoptable(n_frames_sq, z_table, n_tableA);
 
 	/* Recursively find the best point-path the first and last frame. */
-	ED_reduction_n_stoptable(n_frames, n_frames_sq, n_stops, 0, n_table, z_table);
+	printf("B\n");
+	ED_reduction_n_stoptable(n_frames, n_frames_sq, n_stops, 0, n_tableA, n_tableB, z_table);
 
 	/* Store frame indicies */
-	frameIndices = malloc(n_table[n_frames - 1].n * sizeof (int));
-	ED_reduction_copy_stoptable_path(frameIndices, n_table[n_frames - 1].path, n_table[n_frames - 1].n);
+	printf("C\n");
+	frameIndices = MEM_callocN(n_stops * sizeof (int), "NStop_path_new");
+	ED_reduction_copy_stoptable_path(frameIndices, n_tableA[n_frames - 1].path, n_tableA[n_frames - 1].n);
 	
 	/* Clean up */
-	ED_reduction_delete_stoptable(n_frames_sq, z_table);
-	ED_reduction_delete_stoptable(n_frames_sq, n_table);
+	printf("D\n");
+	// ED_reduction_delete_stoptable(n_frames_sq, z_table);
+	// ED_reduction_delete_stoptable(n_frames_sq, n_table);
 	ED_reduction_free_ndim_pose_arr(&n_pose_arr, n_frames);
 	
+	printf("E\n");
 	return frameIndices;
 }
 
 void ED_reduction_reduce_fcurves(ListBase *anim_data, int *frameIndices, int n_stops)
 {
+	int n_frames = ED_reduction_get_number_of_frames(anim_data);
 	bAnimListElem *ale;
 	BezTriple *bezt;
 	FCurve * fcu;
-	int i, index, n_frames;
+	int i, index;
+	Frame reduced_frames[n_stops];
+	Frame org_frames[n_frames];
+	
+
+
 
 	for (ale = anim_data->first; ale; ale = ale->next) {
 		fcu = ale->key_data;
-		n_frames = fcu->totvert;
-		
+
 		/* Cache frame information */
-		Frame org_frames[n_frames];
-		Frame reduced_frames[n_stops];
 		index = 0;
 		for (i = 0, bezt = fcu->bezt; i < n_frames; i++, bezt++) {
 			org_frames[i] = (Frame) { bezt->vec[1][0], bezt->vec[1][1] };
