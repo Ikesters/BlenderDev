@@ -82,7 +82,9 @@
 
 bool ED_reduction_val_in_array(int val, int *arr, int size)
 {
-	for (int i = 0; i < size; i++) {
+	int i;
+
+	for (i = 0; i < size; i++) {
 		if (arr[i] == val)
 			return true;
 	}
@@ -91,8 +93,11 @@ bool ED_reduction_val_in_array(int val, int *arr, int size)
 
 int ED_reduction_get_number_of_frames(ListBase *anim_data)
 {
-	for (bAnimListElem *ale = anim_data->first; ale; ale = ale->next) {
-		FCurve * fcu = (FCurve *)ale->key_data;
+	bAnimListElem *ale;
+	FCurve * fcu;
+
+	for (ale = anim_data->first; ale; ale = ale->next) {
+		fcu = ale->key_data;
 		return fcu->totvert;
 	}
 
@@ -124,13 +129,14 @@ void ED_reduction_fill_ndim_curve(NCurve ncurve, ListBase *anim_data, int n_fram
 { 
 	bAnimListElem *ale;
 	BezTriple *bezt;
+	FCurve * fcu;
 	int i, j;
 	
 	for (j = 0; j < n_frames; j++)
 		ncurve[j][0] = (float) j;
 
 	for (i = 0, ale = anim_data->first; ale; i++, ale = ale->next) {
-		FCurve * fcu = (FCurve *)ale->key_data;
+		fcu = ale->key_data;
 
 		for (j = 0, bezt = fcu->bezt; j < fcu->totvert; j++, bezt++)
 			ncurve[j][i + 1] = bezt->vec[1][1];
@@ -173,9 +179,11 @@ float ED_reduction_chord_to_frame_cost(float *p, float *q1, float *q2, int npts)
 float ED_reduction_segment_cost(NCurve ncurve, int start_f, int end_f, int n_curves)
 {
 	float maxDist = 0;
+	float dist;
+	int i;
 
-	for (int i = start_f; i < end_f; i++) {
-		float dist = ED_reduction_chord_to_frame_cost(ncurve[i], ncurve[start_f], ncurve[end_f], n_curves);
+	for (i = start_f; i < end_f; i++) {
+		dist = ED_reduction_chord_to_frame_cost(ncurve[i], ncurve[start_f], ncurve[end_f], n_curves);
 		
 		if (dist > maxDist)
 			maxDist = dist;
@@ -211,7 +219,9 @@ float ED_reduction_segment_cost(NCurve ncurve, int start_f, int end_f, int n_cur
 
 void ED_reduction_copy_stoptable_path(int *tgt, int *src, int npts)
 {
-	for (int i = 0; i < npts; i++) {
+	int i;
+
+	for (i = 0; i < npts; i++) {
 		tgt[i] = src[i];
 	}
 }
@@ -224,7 +234,9 @@ void ED_reduction_copy_stoptable_path_and_add(int *tgt, int *src, int npts, int 
 
 void ED_reduction_init_stoptable(int npts_sq, NStop table[npts_sq])
 {
-	for (int i = 0; i < npts_sq; i++) {
+	int i;
+
+	for (i = 0; i < npts_sq; i++) {
 		table[i].cost = 99999;
 		table[i].n = 0;
 	} 
@@ -232,7 +244,9 @@ void ED_reduction_init_stoptable(int npts_sq, NStop table[npts_sq])
 
 void ED_reduction_copy_stoptable(int npts_sq, NStop a[npts_sq], NStop b[npts_sq])
 {
-	for (int i = 0; i < npts_sq; i++) {
+	int i;
+
+	for (i = 0; i < npts_sq; i++) {
 		b[i].cost = a[i].cost;
 		b[i].n = a[i].n;
 
@@ -243,7 +257,9 @@ void ED_reduction_copy_stoptable(int npts_sq, NStop a[npts_sq], NStop b[npts_sq]
 
 void ED_reduction_delete_stoptable(int npts_sq, NStop table[npts_sq])
 {
-	for (int i = 0; i < npts_sq; i++) {
+	int i;
+
+	for (i = 0; i < npts_sq; i++) {
 		if (table[i].n > 0) {	
 			free(table[i].path);
 		}
@@ -252,10 +268,12 @@ void ED_reduction_delete_stoptable(int npts_sq, NStop table[npts_sq])
 
 void ED_reduction_zero_stoptable(int npts, int npts_sq, NStop table[npts_sq], NCurve ncurve, int n_curves)
 {
-	for (int i = 0; i < npts - 1; i++) {
-		for (int j = i + 1; j < npts; j++) {
+	int i, j, index;
+
+	for (i = 0; i < npts - 1; i++) {
+		for (j = i + 1; j < npts; j++) {
 			
-			int index = i * npts + j;
+			index = i * npts + j;
 			table[index].cost = ED_reduction_segment_cost(ncurve, i, j, n_curves);
 			table[index].n = 2;
 
@@ -268,22 +286,26 @@ void ED_reduction_zero_stoptable(int npts, int npts_sq, NStop table[npts_sq], NC
 
 void ED_reduction_n_stoptable(int npts, int npts_sq, int n_stops, int n, NStop n_table[npts_sq], NStop z_table[npts_sq])
 {
+	NStop tmp_table[npts_sq];
+	int i, j, k, indexIJ, indexIK, indexKJ;
+	float minCost, cost;
+
 	if (n_table[npts - 1].n == n_stops)
 		return;
 
-	NStop tmp_table[npts_sq];
+	
 	ED_reduction_init_stoptable(npts_sq, tmp_table);
 
-	for (int i = 0; i < npts; i++) {
-		for (int j = i + n + 1; j < npts; j++) {
-			int indexIJ = i * npts + j;
+	for (i = 0; i < npts; i++) {
+		for (j = i + n + 1; j < npts; j++) {
+			indexIJ = i * npts + j;
 
 			/* Find the least cost path between i and j */
-			float minCost = 99999;
-			for (int k = i + 1; k < j; k++) {
-				int indexIK = i * npts + k;
-				int indexKJ = k * npts + j;
-				float cost = max_ff(n_table[indexIK].cost, z_table[indexKJ].cost);
+			minCost = 99999;
+			for (k = i + 1; k < j; k++) {
+				indexIK = i * npts + k;
+				indexKJ = k * npts + j;
+				cost = max_ff(n_table[indexIK].cost, z_table[indexKJ].cost);
 
 				if (cost < minCost) {
 					minCost = cost;	
@@ -316,25 +338,29 @@ void ED_reduction_n_stoptable(int npts, int npts_sq, int n_stops, int n, NStop n
 
 float ED_reduction_interpolation_at(float f, float start_f, float end_f, Anchor anchors)
 {
-	float numer = f - start_f;
-	float denom = end_f - start_f;
-	float t = denom != 0.0 ? numer / denom : numer;
+	float numer, denom, t;
 
-	return                 pow(1 - t, 3) * start_f     + 
+	numer = f - start_f;
+	denom = end_f - start_f;
+	t = denom != 0.0 ? numer / denom : numer;
+
+	return                 pow(1 - t, 3) * start_f    + 
 	       3 *     t     * pow(1 - t, 2) * anchors.p1 +
            3 * pow(t, 2) *    (1 - t   ) * anchors.p2 +
                pow(t ,3)                 * end_f;
 }
 
 float ED_reduction_interpolation_cost(Frame *org_frames, float start_f, float end_f, Anchor anchors) {
-	float maxCost = 0;
+	float i, originalV, interpedV, maxCost, cost;
+	int index;
 
-	int index = 0;
-	for (float i = start_f; i < end_f; i += 1.0) {
-		float originalV = org_frames[index].v;
-		float interpedV = ED_reduction_interpolation_at(i, start_f, end_f, anchors);
+	maxCost = 0;
+	index = 0;
+	for (i = start_f; i < end_f; i += 1.0) {
+		originalV = org_frames[index].v;
+		interpedV = ED_reduction_interpolation_at(i, start_f, end_f, anchors);
 
-		float cost = fabs(originalV - interpedV);
+		cost = fabs(originalV - interpedV);
 		if (cost > maxCost)
 			maxCost = cost;
 
@@ -345,17 +371,19 @@ float ED_reduction_interpolation_cost(Frame *org_frames, float start_f, float en
 }
 
 Anchor ED_reduction_pick_anchor_for_segment(Frame *org_frames, float start_f, float end_f) {
-	float half_segment_length = (end_f - start_f) / 2.0;
-	float inc = half_segment_length / 20.0;
+	float half_segment_length, inc;
+	float i, j, bestI, bestJ, minCost, cost;
 
-	float minCost = 99999.0;
-	float bestI = 0.0;
-	float bestJ = 0.0;
+	half_segment_length = (end_f - start_f) / 2.0;
+	inc = half_segment_length / 20.0;
+	minCost = 99999.0;
+	bestI = 0.0;
+	bestJ = 0.0;
 
-	for (float i = -half_segment_length; i < half_segment_length; i += inc) {
-		for (float j = -half_segment_length; j < half_segment_length; j += inc) {
+	for (i = -half_segment_length; i < half_segment_length; i += inc) {
+		for (j = -half_segment_length; j < half_segment_length; j += inc) {
 
-			float cost = ED_reduction_interpolation_cost(org_frames, start_f, end_f, (Anchor) { i, j });
+			cost = ED_reduction_interpolation_cost(org_frames, start_f, end_f, (Anchor) { i, j });
 			if (cost < minCost) {
 				minCost = cost;
 				bestI = i;
@@ -370,12 +398,14 @@ Anchor ED_reduction_pick_anchor_for_segment(Frame *org_frames, float start_f, fl
 void ED_reduction_tweak_fcurve_anchors(Anchor *anchors, Frame *org_frames, Frame *reduced_frames, int n_reduced)
 {
 	int i;
+	float start_f, end_f;
+
 	for (i = 0; i < n_reduced; i++)
 		anchors[i] = (Anchor) { reduced_frames[i].f, reduced_frames[i].v };
 
 	for (i = 1; i < n_reduced; i++) {
-		float start_f = reduced_frames[i - 1].f;
-		float end_f = reduced_frames[i].f;
+		start_f = reduced_frames[i - 1].f;
+		end_f = reduced_frames[i].f;
 
 		Anchor anchor = ED_reduction_pick_anchor_for_segment(org_frames, start_f, end_f);
 		anchors[i - 1].p2 = anchor.p1;
@@ -398,17 +428,20 @@ void ED_reduction_tweak_fcurve_anchors(Anchor *anchors, Frame *org_frames, Frame
  
 int *ED_reduction_pick_best_frames(ListBase *anim_data, int n_stops)
 {
+	int n_curves, n_frames, n_frames_sq;
+	int *frameIndices;
+	NCurve ncurve;
 
-	int n_curves = BLI_countlist(anim_data) + 1;
-	int n_frames = ED_reduction_get_number_of_frames(anim_data);
-	int n_frames_sq = n_frames * n_frames;
+	n_curves = BLI_countlist(anim_data) + 1;
+	n_frames = ED_reduction_get_number_of_frames(anim_data);
+	n_frames_sq = n_frames * n_frames;
 
 	/* Construct n-dimensional curve */
-	NCurve ncurve = ED_reduction_alloc_ndim_curve(n_frames, n_curves);
+	ncurve = ED_reduction_alloc_ndim_curve(n_frames, n_curves);
 	ED_reduction_fill_ndim_curve(ncurve, anim_data, n_frames);
 
 	/* Build dynamic-programming tables */
-	NStop z_table[n_frames_sq];
+	NStop z_table[n_frames_sq]; // TODO fix this
 	NStop n_table[n_frames_sq];
 	ED_reduction_init_stoptable(n_frames_sq, z_table);
 	ED_reduction_init_stoptable(n_frames_sq, n_table);
@@ -419,7 +452,7 @@ int *ED_reduction_pick_best_frames(ListBase *anim_data, int n_stops)
 	ED_reduction_n_stoptable(n_frames, n_frames_sq, n_stops, 0, n_table, z_table);
 
 	/* Store frame indicies */
-	int *frameIndices = malloc(n_table[n_frames - 1].n * sizeof (int));
+	frameIndices = malloc(n_table[n_frames - 1].n * sizeof (int));
 	ED_reduction_copy_stoptable_path(frameIndices, n_table[n_frames - 1].path, n_table[n_frames - 1].n);
 	
 	/* Clean up */
@@ -435,16 +468,16 @@ void ED_reduction_reduce_fcurves(ListBase *anim_data, int *frameIndices, int n_s
 	bAnimListElem *ale;
 	BezTriple *bezt;
 	FCurve * fcu;
-	int i, n_frames;
+	int i, index, n_frames;
 
 	for (ale = anim_data->first; ale; ale = ale->next) {
-		fcu = (FCurve *)ale->key_data;
+		fcu = ale->key_data;
 		n_frames = fcu->totvert;
 		
 		/* Cache frame information */
 		Frame org_frames[n_frames];
 		Frame reduced_frames[n_stops];
-		int index = 0;
+		index = 0;
 		for (i = 0, bezt = fcu->bezt; i < n_frames; i++, bezt++) {
 			org_frames[i] = (Frame) { bezt->vec[1][0], bezt->vec[1][1] };
 			if (ED_reduction_val_in_array(i, frameIndices, n_stops)) {
@@ -460,7 +493,7 @@ void ED_reduction_reduce_fcurves(ListBase *anim_data, int *frameIndices, int n_s
 		calchandles_fcurve(fcu);
 
 		/* Tweaking the bezier handles of the new keyframes to best repliciate the original data */
-		Anchor anchors[n_stops];
+		Anchor anchors[n_stops]; // TODO
 		ED_reduction_tweak_fcurve_anchors(anchors, org_frames, reduced_frames, n_stops);
 		for (i = 0, bezt = fcu->bezt; i < fcu->totvert; i++, bezt++) {
 			if (i != 0)
