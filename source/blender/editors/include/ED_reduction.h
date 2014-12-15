@@ -34,10 +34,11 @@
 
 /* Utilities -------------------------------------------------------------------------------------------------------- */
 /* 
- * Utility functions that are used in this module. I feel Blender must have these functions written somewhere that I am
- * not yet aware of, I intend to eventually remove them.
+ * Various utility functions, nothing interesting to see here.
  */
 
+void   ED_reduction_copy_indicies         (int *tgt, int *src, int npts);
+void   ED_reduction_copy_indicies_and_add (int *tgt, int *src, int npts, int v);
 bool   ED_reduction_val_in_array          (int val, int *arr, int size);
 int    ED_reduction_get_number_of_frames  (ListBase *anim_data);
 
@@ -97,14 +98,13 @@ typedef struct NStop {
 	int n;
 	int *path;
 } NStop;
+typedef NStop *StopTable;
 
-void ED_reduction_copy_stoptable_path         (int *tgt, int *src, int npts);
-void ED_reduction_copy_stoptable_path_and_add (int *tgt, int *src, int npts, int v);
-void ED_reduction_init_stoptable              (NStop **table, int npts_sq, int n_stops);
-void ED_reduction_copy_stoptable              (int npts_sq, NStop *a, NStop *b);
-void ED_reduction_delete_stoptable            (int npts_sq, NStop *table);
-void ED_reduction_zero_stoptable              (int npts, NStop *table, NPoseArr *n_pose_arr, int n_curves);
-void ED_reduction_n_stoptable                 (int npts, int npts_sq, int n_stops, int n, NStop *n_table, NStop *n_tableBuffer, NStop *z_table);
+void ED_reduction_init_stoptable              (StopTable *table, int npts_sq, int n_stops);
+void ED_reduction_copy_stoptable              (int npts_sq, StopTable a, StopTable b);
+void ED_reduction_delete_stoptable            (int npts_sq, StopTable *table);
+void ED_reduction_zero_stoptable              (int npts, StopTable table, NPoseArr *n_pose_arr, int n_curves);
+void ED_reduction_n_stoptable                 (int npts, int npts_sq, int n_stops, int n, StopTable n_table, StopTable n_tableBuffer, StopTable z_table);
 
 
 /* Bezier Handle Tweaking ------------------------------------------------------------------------------------------- */
