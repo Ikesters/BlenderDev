@@ -44,6 +44,7 @@ set(SRC
 	anim_ipo_utils.c
 	anim_markers.c
 	anim_ops.c
+	anim_reduction.c
 	drivers.c
 	fmodifier_ui.c
 	keyframes_draw.c
@@ -51,6 +52,7 @@ set(SRC
 	keyframes_general.c
 	keyframing.c
 	keyingsets.c
+
 
 	anim_intern.h
 )

@@ -42,7 +42,6 @@ set(SRC
 	graph_ops.c
 	graph_select.c
 	graph_utils.c
-    graph_reduction.c
 	space_graph.c
 
 	graph_intern.h

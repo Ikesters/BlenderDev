@@ -69,9 +69,7 @@
 #include "ED_types.h"
 #include "ED_keyframing.h"
 #include "ED_keyframes_edit.h"
-#include "ED_reduction.h"
-
-#include "graph_intern.h"
+#include "ED_keyframes_reduction.h"
 
 
 /* Utilities -------------------------------------------------------------------------------------------------------- */
