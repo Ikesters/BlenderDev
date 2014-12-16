@@ -1025,12 +1025,14 @@ static void reduce_keyframes(bAnimContext *ac, int n_keys)
 {   
 	ListBase anim_data = {NULL, NULL};
 	bAnimListElem *ale;
-
+	FCurve * fcu;
 	int filter;
 
 	int n_frames, n_curves;
 	NPoseArr n_pose_arr;
 	int *indices;
+	Frame *org_frames;
+	Frame *reduced_frames;
 	
 	/* filter data */
 	filter = (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_CURVE_VISIBLE | ANIMFILTER_FOREDIT | ANIMFILTER_NODUPLIS | ANIMFILTER_SEL);
@@ -1045,9 +1047,23 @@ static void reduce_keyframes(bAnimContext *ac, int n_keys)
 	/* Pick the best placement of keyframes, and then reconstruct each curve based on this placement */
 	indices = MEM_mallocN(sizeof(int) * n_keys, "indices");
 	ED_reduction_pick_best_frames(n_pose_arr, n_keys, n_frames, n_curves, indices);
-	
+
 	for (ale = anim_data.first; ale; ale = ale->next) {
-		ED_reduction_reduce_fcurve(ale->key_data, indices, n_frames, n_keys);
+		fcu = ale->key_data;
+
+		/* Cache keyframe data for this fcurve */
+		ED_reduction_init_frame_cache(&org_frames, n_frames);
+		ED_reduction_init_frame_cache(&reduced_frames, n_keys);
+		ED_reduction_cache_fcurve(org_frames, fcu);
+		ED_reduction_cache_indices_of_fcurve(reduced_frames, fcu, indices, n_keys);
+
+		/* Delete and rebuild the curve, and finally tweak the bezier handles to match the original data */
+		ED_reduction_reduce_fcurve_to_frames(fcu, reduced_frames, n_keys);
+		ED_reduction_tweak_fcurve_anchors(fcu, org_frames, reduced_frames);
+		
+		/* Clean up */
+		ED_reduction_delete_frame_cache(&org_frames);
+		ED_reduction_delete_frame_cache(&reduced_frames);
 		ale->update |= ANIM_UPDATE_DEFAULT;
 	}
 
@@ -1069,7 +1085,7 @@ static int reduce_keyframes_exec(bContext *C, wmOperator *op)
 		return OPERATOR_CANCELLED;
 		
 	/* get reduce key count */
-	n_keys = RNA_int_get(op->ptr, "KeyCount");
+	n_keys = RNA_int_get(op->ptr, "NKeys");
 	
 	/* reduce keyframes */
 	reduce_keyframes(&ac, n_keys);
@@ -1111,7 +1127,7 @@ void GRAPH_OT_reduce(wmOperatorType *ot)
 	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 	
 	/* properties */
-	ot->prop = RNA_def_int(ot->srna, "KeyCount", 8, 3, 100, "Number of Keys", "", 3, 100);
+	ot->prop = RNA_def_int(ot->srna, "NKeys", 8, 3, 100, "Number of keyframes to reduce to", "", 3, 100);
 }
 
 /* ******************** Bake F-Curve Operator *********************** */

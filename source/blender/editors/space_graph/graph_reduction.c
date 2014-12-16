@@ -127,9 +127,9 @@ void ED_reduction_init_pose_arr(NPoseArr *n_pose_arr, int n_frames, int n_curves
 {
 	int i;
 
-	(*n_pose_arr) = MEM_callocN(sizeof(float *) * n_frames, "NPoseArr_new");
+	(*n_pose_arr) = MEM_mallocN(sizeof(float *) * n_frames, "NPoseArr_new");
 	for (i = 0; i < n_frames; i++)
-		(*n_pose_arr)[i] = MEM_callocN(sizeof(float) * n_curves, "NPoseArr_row");
+		(*n_pose_arr)[i] = MEM_mallocN(sizeof(float) * n_curves, "NPoseArr_row");
 }
 
 
@@ -317,6 +317,54 @@ void ED_reduction_n_stoptable(int n_frames, int n_keys, int n, StopTable n_table
 	ED_reduction_n_stoptable(n_frames, n_keys, n + 1, n_tableBuffer, n_table, z_table);
 }
 
+/* Keyframe Data Caching -------------------------------------------------------------------------------------------- */
+/*
+ * These functions create, fill, and delete the frame cache data structure. The frame cache is used to remember the data
+ * of an fcurve after it has been deleted.
+ */
+ 
+void ED_reduction_init_frame_cache(FrameCache *cache, int n)
+{
+	*cache = MEM_mallocN(sizeof(Frame) * n, "FrameCache_new");
+}
+
+void ED_reduction_cache_fcurve(FrameCache cache, FCurve * fcu)
+{
+	Frame tmpFrame;
+	BezTriple *bezt;
+	int i;
+
+	for (i = 0, bezt = fcu->bezt; i < fcu->totvert; i++, bezt++) {
+		tmpFrame.f = bezt->vec[1][0];
+		tmpFrame.v = bezt->vec[1][1];
+		cache[i] = tmpFrame;
+	}
+}
+
+void ED_reduction_cache_indices_of_fcurve(FrameCache cache, FCurve * fcu, int *indices, int n_keys)
+{
+	Frame tmpFrame;
+	BezTriple *bezt;
+	int i, index;
+
+	index = 0;
+	for (i = 0, bezt = fcu->bezt; i < fcu->totvert; i++, bezt++) {
+		if (ED_reduction_val_in_array(i, indices, n_keys)) {
+			tmpFrame.f = bezt->vec[1][0];
+			tmpFrame.v = bezt->vec[1][1];
+			cache[index] = tmpFrame;
+
+			index ++;
+		}
+	}
+}
+
+void ED_reduction_delete_frame_cache(FrameCache *cache)
+{
+	MEM_freeN(*cache);	
+}
+
+
 /* Bezier Handle Tweaking ------------------------------------------------------------------------------------------- */
 /*
  * This algorithm tries a set of different bezier-handle placements for the new keyframes. If a placement that matches
@@ -390,26 +438,6 @@ Anchor ED_reduction_pick_anchor_for_segment(Frame *org_frames, float start_f, fl
 	return (Anchor) { bestI, bestJ };
 }
 
-void ED_reduction_tweak_fcurve_anchors(FCurve * fcu, Frame *org_frames, Frame *reduced_frames)
-{
-	int i;
-	float start_f, end_f;
-	BezTriple *bezLeft;
-	BezTriple *bezRight;
-
-	for (i = 1; i < fcu->totvert; i++) {
-		start_f = reduced_frames[i - 1].f;
-		end_f = reduced_frames[i].f;
-		Anchor anchor = ED_reduction_pick_anchor_for_segment(org_frames, start_f, end_f);
-		
-		bezLeft  = (fcu->bezt + i - 1);
-		bezRight = (fcu->bezt + i);
-		bezRight->vec[0][1] = anchor.p1;
-		bezLeft->vec[2][1] = anchor.p2;
-	}
-}
-
-
 
 /* Reduction API ---------------------------------------------------------------------------------------------------- */
 /*
@@ -448,39 +476,31 @@ void ED_reduction_pick_best_frames(NPoseArr n_pose_arr, int n_keys, int n_frames
 	ED_reduction_free_pose_arr(&n_pose_arr, n_frames);
 }
 
-void ED_reduction_reduce_fcurve(FCurve * fcu, int *indices, int n_frames, int n_keys)
+void ED_reduction_reduce_fcurve_to_frames(FCurve * fcu, FrameCache reduced_frames, int n_keys)
 {
-	BezTriple *bezt;
-	int i, index;
+	int i;
 
-	Frame tmpFrame;
-	Frame *org_frames = MEM_mallocN(n_frames * sizeof(Frame), "FrameCache");
-	Frame *reduced_frames = MEM_mallocN(n_keys * sizeof(Frame), "FrameCache");
-
-	/* Cache frame information */
-	index = 0;
-	for (i = 0, bezt = fcu->bezt; i < n_frames; i++, bezt++) {
-		tmpFrame.f = bezt->vec[1][0];
-		tmpFrame.v = bezt->vec[1][1];
-		org_frames[i] = tmpFrame;
-
-		if (ED_reduction_val_in_array(i, indices, n_keys)) {
-			reduced_frames[index] = tmpFrame;
-			index ++;
-		}
-	}
-
-	/* Delete all the existing keyframes, adding only the best ones back in */
 	clear_fcurve_keys(fcu);
 	for (i = 0; i < n_keys; i++)
 		insert_vert_fcurve(fcu, reduced_frames[i].f, reduced_frames[i].v, 1);
 	calchandles_fcurve(fcu);
-
-	/* Tweaking the bezier handles of the new keyframes to best repliciate the cached data */
-	ED_reduction_tweak_fcurve_anchors(fcu, org_frames, reduced_frames);
-
-	/* Clean up */
-	MEM_freeN(org_frames);
-	MEM_freeN(reduced_frames);
 }
 
+void ED_reduction_tweak_fcurve_anchors(FCurve * fcu, Frame *org_frames, Frame *reduced_frames)
+{
+	int i;
+	float start_f, end_f;
+	BezTriple *bezLeft;
+	BezTriple *bezRight;
+
+	for (i = 1; i < fcu->totvert; i++) {
+		start_f = reduced_frames[i - 1].f;
+		end_f = reduced_frames[i].f;
+		Anchor anchor = ED_reduction_pick_anchor_for_segment(org_frames, start_f, end_f);
+		
+		bezLeft  = (fcu->bezt + i - 1);
+		bezRight = (fcu->bezt + i);
+		bezRight->vec[0][1] = anchor.p1;
+		bezLeft->vec[2][1] = anchor.p2;
+	}
+}

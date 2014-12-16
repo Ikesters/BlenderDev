@@ -111,6 +111,25 @@ void ED_reduction_n_stoptable                 (int n_frames, int n_keys, int n, 
 																				StopTable z_table);
 
 
+/* Keyframe Data Caching -------------------------------------------------------------------------------------------- */
+/*
+ * These functions create, fill, and delete the frame cache data structure. The frame cache is used to remember the data
+ * of an fcurve after it has been deleted.
+ */
+ 
+typedef struct Frame {
+	float f;
+	float v;
+} Frame;
+
+typedef Frame *FrameCache;
+
+void ED_reduction_init_frame_cache(FrameCache *cache, int n);
+void ED_reduction_cache_fcurve(FrameCache cache, FCurve * fcu);
+void ED_reduction_cache_indices_of_fcurve(FrameCache cache, FCurve * fcu, int *indices, int n_keys);
+void ED_reduction_delete_frame_cache(FrameCache *cache);
+
+
 /* Bezier Handle Tweaking ------------------------------------------------------------------------------------------- */
 /*
  * This algorithm tries a set of different bezier-handle placements for the new keyframes. If a placement that matches
@@ -122,11 +141,6 @@ void ED_reduction_n_stoptable                 (int n_frames, int n_keys, int n, 
  * handle at half the width of the section below the keyframe, and the last half the width above.
  */
 
-typedef struct Frame {
-	float f;
-	float v;
-} Frame;
-
 typedef struct Anchor {
 	float p1;
 	float p2;
@@ -135,7 +149,6 @@ typedef struct Anchor {
 float  ED_reduction_interpolation_at       (float f, float start_f, float end_f, Anchor anchors);
 float  ED_reduction_interpolation_cost     (Frame *org_frames, float start_f, float end_f, Anchor anchors);
 Anchor ED_reduction_pick_anchor_for_segment(Frame *org_frames, float start_f, float end_f);
-void   ED_reduction_tweak_fcurve_anchors   (FCurve * fcu, Frame *org_frames, Frame *reduced_frames);
 
 
 /* Reduction -------------------------------------------------------------------------------------------------------- */
@@ -149,8 +162,9 @@ void   ED_reduction_tweak_fcurve_anchors   (FCurve * fcu, Frame *org_frames, Fra
  * curve to those indicated by the given indices, and then runs the bezier handle tweaking algorithm.
  */
 
-void ED_reduction_pick_best_frames (NPoseArr n_pose_arr, int n_keys, int n_frames, int n_curves, int *indices);
-void ED_reduction_reduce_fcurve    (FCurve * fcu, int *indices, int n_frames, int n_keys);
+void ED_reduction_pick_best_frames        (NPoseArr n_pose_arr, int n_keys, int n_frames, int n_curves, int *indices);
+void ED_reduction_reduce_fcurve_to_frames (FCurve * fcu, FrameCache reduced_frames, int n_keys);
+void ED_reduction_tweak_fcurve_anchors    (FCurve * fcu, Frame *org_frames, Frame *reduced_frames);
 
 
 /* Registration ----------------------------------------------------------------------------------------------------- */
