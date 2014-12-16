@@ -1021,41 +1021,45 @@ void GRAPH_OT_clean(wmOperatorType *ot)
 
 /* ******************** Reduce Keyframes Operator ************************* */
 
-static void reduce_keyframes(bAnimContext *ac, int n_keys)
+static void reduce_keyframes(ListBase *anim_data, int n_keys, bool usingBezTriples)
 {   
-	ListBase anim_data = {NULL, NULL};
 	bAnimListElem *ale;
 	FCurve * fcu;
-	int filter;
 
 	int n_frames, n_curves;
 	NPoseArr n_pose_arr;
 	int *indices;
 	Frame *org_frames;
 	Frame *reduced_frames;
-	
-	/* filter data */
-	filter = (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_CURVE_VISIBLE | ANIMFILTER_FOREDIT | ANIMFILTER_NODUPLIS | ANIMFILTER_SEL);
-	ANIM_animdata_filter(ac, &anim_data, filter, ac->data, ac->datatype);
 
 	/* Cache data into a pose array, refer to the pose array construction section in ED_keyframe_reduction */
-	n_frames = ED_reduction_get_number_of_frames(&anim_data);
-	n_curves = BLI_countlist(&anim_data) + 1;
+	n_frames = ED_reduction_get_number_of_frames(anim_data);
+	n_curves = BLI_countlist(anim_data) + 1;
 	ED_reduction_init_pose_arr(&n_pose_arr, n_frames, n_curves);
-	ED_reduction_fill_pose_arr(&n_pose_arr, &anim_data, n_frames);
+
+	if (usingBezTriples)
+		ED_reduction_fill_pose_arr_beziertriples(&n_pose_arr, anim_data, n_frames);
+	else
+		ED_reduction_fill_pose_arr_fpoints(&n_pose_arr, anim_data, n_frames);
 
 	/* Pick the best placement of keyframes, and then reconstruct each curve based on this placement */
 	indices = MEM_mallocN(sizeof(int) * n_keys, "indices");
 	ED_reduction_pick_best_frames(n_pose_arr, n_keys, n_frames, n_curves, indices);
 
-	for (ale = anim_data.first; ale; ale = ale->next) {
+	for (ale = (*anim_data).first; ale; ale = ale->next) {
 		fcu = ale->key_data;
 
 		/* Cache keyframe data for this fcurve */
 		ED_reduction_init_frame_cache(&org_frames, n_frames);
 		ED_reduction_init_frame_cache(&reduced_frames, n_keys);
-		ED_reduction_cache_fcurve(org_frames, fcu);
-		ED_reduction_cache_indices_of_fcurve(reduced_frames, fcu, indices, n_keys);
+
+		if (usingBezTriples) {
+			ED_reduction_cache_fcurve_beztriples(org_frames, fcu);
+			ED_reduction_cache_indices_of_fcurve_beztriples(reduced_frames, fcu, indices, n_keys);
+		} else {
+			ED_reduction_cache_fcurve_fpoints(org_frames, fcu);
+			ED_reduction_cache_indices_of_fcurve_fpoints(reduced_frames, fcu, indices, n_keys);
+		}
 
 		/* Delete and rebuild the curve, and finally tweak the bezier handles to match the original data */
 		ED_reduction_reduce_fcurve_to_frames(fcu, reduced_frames, n_keys);
@@ -1069,8 +1073,32 @@ static void reduce_keyframes(bAnimContext *ac, int n_keys)
 
 	/* Clean up */
 	MEM_freeN(indices);
+}
+
+static int reduce_keyframes_wrapper(bAnimContext *ac, int n_keys) {
+	ListBase anim_data = {NULL, NULL};
+	bAnimListElem *ale;
+	FCurve *fcu;
+	int filter;
+
+	/* filter data */
+	filter = (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_CURVE_VISIBLE | ANIMFILTER_FOREDIT | ANIMFILTER_NODUPLIS | ANIMFILTER_SEL);
+	ANIM_animdata_filter(ac, &anim_data, filter, ac->data, ac->datatype);
+
+	ale = anim_data.first;
+	fcu = ale->key_data;
+
+	if (fcu && fcu->bezt) {
+		reduce_keyframes(&anim_data, n_keys, true);
+	} else if (fcu && fcu->fpt) {
+		reduce_keyframes(&anim_data, n_keys, false);
+	} else {
+		return 0;
+	}
+
 	ANIM_animdata_update(ac, &anim_data);
 	ANIM_animdata_freelist(&anim_data);
+	return 1;
 }
 
 /* ------------------- */
@@ -1079,6 +1107,7 @@ static int reduce_keyframes_exec(bContext *C, wmOperator *op)
 {
 	bAnimContext ac;
 	int n_keys;
+	int success;
 	
 	/* get editor data */
 	if (ANIM_animdata_get_context(C, &ac) == 0)
@@ -1088,12 +1117,14 @@ static int reduce_keyframes_exec(bContext *C, wmOperator *op)
 	n_keys = RNA_int_get(op->ptr, "NKeys");
 	
 	/* reduce keyframes */
-	reduce_keyframes(&ac, n_keys);
+	success = reduce_keyframes_wrapper(&ac, n_keys);
 	
-	/* set notifier that keyframes have changed */
-	WM_event_add_notifier(C, NC_ANIMATION | ND_KEYFRAME | NA_EDITED, NULL);
-	
-	return OPERATOR_FINISHED;
+	if (success) {
+		WM_event_add_notifier(C, NC_ANIMATION | ND_KEYFRAME | NA_EDITED, NULL);
+		return OPERATOR_FINISHED;
+	} else {
+		return OPERATOR_CANCELLED;
+	}
 }
 
 static int reduce_keyframes_invoke_wrapper(bContext *C, wmOperator *op, const wmEvent *event)
@@ -1121,7 +1152,7 @@ void GRAPH_OT_reduce(wmOperatorType *ot)
 	/* api callbacks */
 	ot->invoke = reduce_keyframes_invoke_wrapper;
 	ot->exec = reduce_keyframes_exec;
-	ot->poll = graphop_editable_keyframes_poll;
+	ot->poll = graphop_selected_fcurve_poll;
 	
 	/* flags */
 	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;

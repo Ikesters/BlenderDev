@@ -134,11 +134,11 @@ void ED_reduction_init_pose_arr(NPoseArr *n_pose_arr, int n_frames, int n_curves
 
 
 
-void ED_reduction_fill_pose_arr(NPoseArr *n_pose_arr, ListBase *anim_data, int n_frames)
+void ED_reduction_fill_pose_arr_beziertriples(NPoseArr *n_pose_arr, ListBase *anim_data, int n_frames)
 { 
 	bAnimListElem *ale;
+	FCurve *fcu;
 	BezTriple *bezt;
-	FCurve * fcu;
 	int i, j;
 	
 	for (j = 0; j < n_frames; j++)
@@ -149,6 +149,24 @@ void ED_reduction_fill_pose_arr(NPoseArr *n_pose_arr, ListBase *anim_data, int n
 
 		for (j = 0, bezt = fcu->bezt; j < fcu->totvert; j++, bezt++)
 			(*n_pose_arr)[j][i + 1] = bezt->vec[1][1];
+	}
+}
+
+void ED_reduction_fill_pose_arr_fpoints(NPoseArr *n_pose_arr, ListBase *anim_data, int n_frames)
+{
+	bAnimListElem *ale;
+	FCurve *fcu;
+	FPoint *fpt;
+	int i, j;
+
+	for (j = 0; j < n_frames; j++)
+		(*n_pose_arr)[j][0] = j;
+
+	for (i = 0, ale = anim_data->first; ale; i++, ale = ale->next) {
+		fcu = ale->key_data;
+
+		for (j = 0, fpt = fcu->fpt; j < fcu->totvert; j++, fpt++)
+			(*n_pose_arr)[j][i + 1] = fpt->vec[1];
 	}
 }
 
@@ -283,15 +301,17 @@ void ED_reduction_zero_stoptable(StopTable table, NPoseArr *n_pose_arr, int n_fr
 	}
 }
 
-void ED_reduction_n_stoptable(int n_frames, int n_keys, int n, StopTable n_table,
-	    													   StopTable n_tableBuffer,
-	    													   StopTable z_table)
+void ED_reduction_n_stoptable(int *indices, int n_frames, int n_keys, int n, StopTable n_table,
+																			 StopTable n_tableBuffer,
+																			 StopTable z_table)
 {
 	int i, j, k, ij, ik, kj;
 	float cost_min, cost;
 
-	if (n_table[n_frames - 1].n == n_keys)
+	if (n_table[n_frames - 1].n == n_keys) {
+		ED_reduction_copy_indicies(indices, n_table[n_frames - 1].path, n_table[n_frames - 1].n);
 		return;
+	}
 
 	for (i = 0; i < n_frames; i++) {
 		for (j = i + n + 1; j < n_frames; j++) {
@@ -314,7 +334,7 @@ void ED_reduction_n_stoptable(int n_frames, int n_keys, int n, StopTable n_table
 		}
 	}
 
-	ED_reduction_n_stoptable(n_frames, n_keys, n + 1, n_tableBuffer, n_table, z_table);
+	ED_reduction_n_stoptable(indices, n_frames, n_keys, n + 1, n_tableBuffer, n_table, z_table);
 }
 
 /* Keyframe Data Caching -------------------------------------------------------------------------------------------- */
@@ -322,13 +342,13 @@ void ED_reduction_n_stoptable(int n_frames, int n_keys, int n, StopTable n_table
  * These functions create, fill, and delete the frame cache data structure. The frame cache is used to remember the data
  * of an fcurve after it has been deleted.
  */
- 
+
 void ED_reduction_init_frame_cache(FrameCache *cache, int n)
 {
 	*cache = MEM_mallocN(sizeof(Frame) * n, "FrameCache_new");
 }
 
-void ED_reduction_cache_fcurve(FrameCache cache, FCurve * fcu)
+void ED_reduction_cache_fcurve_beztriples(FrameCache cache, FCurve * fcu)
 {
 	Frame tmpFrame;
 	BezTriple *bezt;
@@ -341,7 +361,7 @@ void ED_reduction_cache_fcurve(FrameCache cache, FCurve * fcu)
 	}
 }
 
-void ED_reduction_cache_indices_of_fcurve(FrameCache cache, FCurve * fcu, int *indices, int n_keys)
+void ED_reduction_cache_indices_of_fcurve_beztriples(FrameCache cache, FCurve * fcu, int *indices, int n_keys)
 {
 	Frame tmpFrame;
 	BezTriple *bezt;
@@ -358,6 +378,38 @@ void ED_reduction_cache_indices_of_fcurve(FrameCache cache, FCurve * fcu, int *i
 		}
 	}
 }
+
+void ED_reduction_cache_fcurve_fpoints(FrameCache cache, FCurve * fcu)
+{
+	Frame tmpFrame;
+	FPoint *fpt;
+	int i;
+
+	for (i = 0, fpt = fcu->fpt; i < fcu->totvert; i++, fpt++) {
+		tmpFrame.f = fpt->vec[0];
+		tmpFrame.v = fpt->vec[1];
+		cache[i] = tmpFrame;
+	}
+}
+
+void ED_reduction_cache_indices_of_fcurve_fpoints(FrameCache cache, FCurve * fcu, int *indices, int n_keys)
+{
+	Frame tmpFrame;
+	FPoint *fpt;
+	int i, index;
+
+	index = 0;
+	for (i = 0, fpt = fcu->fpt; i < fcu->totvert; i++, fpt++) {
+		if (ED_reduction_val_in_array(i, indices, n_keys)) {
+			tmpFrame.f = fpt->vec[0];
+			tmpFrame.v = fpt->vec[1];
+			cache[index] = tmpFrame;
+
+			index ++;
+		}
+	}
+}
+
 
 void ED_reduction_delete_frame_cache(FrameCache *cache)
 {
@@ -464,10 +516,7 @@ void ED_reduction_pick_best_frames(NPoseArr n_pose_arr, int n_keys, int n_frames
 	ED_reduction_copy_stoptable(z_table, n_table, n_frames);
 
 	/* Recursively find the best point-path the first and last frame. */
-	ED_reduction_n_stoptable(n_frames, n_keys, 0, n_table, n_tableBuffer, z_table);
-
-	/* Save indices of the best frames */
-	ED_reduction_copy_indicies(indices, n_table[n_frames - 1].path, n_table[n_frames - 1].n);
+	ED_reduction_n_stoptable(indices, n_frames, n_keys, 0, n_table, n_tableBuffer, z_table);
 	
 	/* Clean up */
 	ED_reduction_delete_stoptable(&z_table, n_frames);
@@ -480,10 +529,15 @@ void ED_reduction_reduce_fcurve_to_frames(FCurve * fcu, FrameCache reduced_frame
 {
 	int i;
 
-	clear_fcurve_keys(fcu);
+	/* Free any existing data */
+	if (fcu->bezt) MEM_freeN(fcu->bezt);
+	if (fcu->fpt) MEM_freeN(fcu->fpt);
+	fcu->bezt = NULL;
+	fcu->fpt = NULL;
+	fcu->totvert = 0;
+
 	for (i = 0; i < n_keys; i++)
 		insert_vert_fcurve(fcu, reduced_frames[i].f, reduced_frames[i].v, 1);
-	calchandles_fcurve(fcu);
 }
 
 void ED_reduction_tweak_fcurve_anchors(FCurve * fcu, Frame *org_frames, Frame *reduced_frames)

@@ -53,9 +53,10 @@ int    ED_reduction_get_number_of_frames  (ListBase *anim_data);
 
 typedef float **NPoseArr;
 
-void ED_reduction_init_pose_arr (NPoseArr *n_pose_arr, int n_frames, int n_curves);
-void ED_reduction_fill_pose_arr (NPoseArr *n_pose_arr, ListBase *anim_data, int n_frames);
-void ED_reduction_free_pose_arr (NPoseArr *n_pose_arr, int n_frames);
+void ED_reduction_init_pose_arr               (NPoseArr *n_pose_arr, int n_frames, int n_curves);
+void ED_reduction_fill_pose_arr_beziertriples (NPoseArr *n_pose_arr, ListBase *anim_data, int n_frames);
+void ED_reduction_fill_pose_arr_fpoints       (NPoseArr *n_pose_arr, ListBase *anim_data, int n_frames);
+void ED_reduction_free_pose_arr               (NPoseArr *n_pose_arr, int n_frames);
 
 
 /* Cost Analysis ---------------------------------------------------------------------------------------------------- */
@@ -106,9 +107,9 @@ void ED_reduction_init_stoptable              (StopTable *table, int n_frames, i
 void ED_reduction_copy_stoptable              (StopTable a, StopTable b, int n_frames);
 void ED_reduction_delete_stoptable            (StopTable *table, int n_frames);
 void ED_reduction_zero_stoptable              (StopTable table, NPoseArr *n_pose_arr, int n_frames, int n_curves);
-void ED_reduction_n_stoptable                 (int n_frames, int n_keys, int n, StopTable n_table,
-																				StopTable n_tableBuffer,
-																				StopTable z_table);
+void ED_reduction_n_stoptable                 (int *indices, int n_frames, int n_keys, int n, StopTable n_table,
+																							  StopTable n_tableBuffer,
+																							  StopTable z_table);
 
 
 /* Keyframe Data Caching -------------------------------------------------------------------------------------------- */
@@ -116,7 +117,7 @@ void ED_reduction_n_stoptable                 (int n_frames, int n_keys, int n, 
  * These functions create, fill, and delete the frame cache data structure. The frame cache is used to remember the data
  * of an fcurve after it has been deleted.
  */
- 
+
 typedef struct Frame {
 	float f;
 	float v;
@@ -124,10 +125,12 @@ typedef struct Frame {
 
 typedef Frame *FrameCache;
 
-void ED_reduction_init_frame_cache(FrameCache *cache, int n);
-void ED_reduction_cache_fcurve(FrameCache cache, FCurve * fcu);
-void ED_reduction_cache_indices_of_fcurve(FrameCache cache, FCurve * fcu, int *indices, int n_keys);
-void ED_reduction_delete_frame_cache(FrameCache *cache);
+void ED_reduction_init_frame_cache                   (FrameCache *cache, int n);
+void ED_reduction_cache_fcurve_beztriples            (FrameCache cache, FCurve * fcu);
+void ED_reduction_cache_indices_of_fcurve_beztriples (FrameCache cache, FCurve * fcu, int *indices, int n_keys);
+void ED_reduction_cache_fcurve_fpoints               (FrameCache cache, FCurve * fcu);
+void ED_reduction_cache_indices_of_fcurve_fpoints    (FrameCache cache, FCurve * fcu, int *indices, int n_keys);
+void ED_reduction_delete_frame_cache                 (FrameCache *cache);
 
 
 /* Bezier Handle Tweaking ------------------------------------------------------------------------------------------- */
