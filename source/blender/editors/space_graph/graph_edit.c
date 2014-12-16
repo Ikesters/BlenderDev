@@ -1023,9 +1023,9 @@ void GRAPH_OT_clean(wmOperatorType *ot)
 
 static void reduce_keyframes(ListBase *anim_data, int n_keys, bool usingBezTriples)
 {   
+	/* ??? Can I tidy this up somehow? */
 	bAnimListElem *ale;
 	FCurve * fcu;
-
 	int n_frames, n_curves;
 	NPoseArr n_pose_arr;
 	int *indices;
@@ -1042,10 +1042,12 @@ static void reduce_keyframes(ListBase *anim_data, int n_keys, bool usingBezTripl
 	else
 		ED_reduction_fill_pose_arr_fpoints(&n_pose_arr, anim_data, n_frames);
 
-	/* Pick the best placement of keyframes, and then reconstruct each curve based on this placement */
+	/* Pick the best placement of keyframes */
 	indices = MEM_mallocN(sizeof(int) * n_keys, "indices");
 	ED_reduction_pick_best_frames(n_pose_arr, n_keys, n_frames, n_curves, indices);
 
+
+	/* For each fcurve, delete all data and then reconstruct based on the given caches */
 	for (ale = (*anim_data).first; ale; ale = ale->next) {
 		fcu = ale->key_data;
 
@@ -1085,16 +1087,22 @@ static int reduce_keyframes_wrapper(bAnimContext *ac, int n_keys) {
 	filter = (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_CURVE_VISIBLE | ANIMFILTER_FOREDIT | ANIMFILTER_NODUPLIS | ANIMFILTER_SEL);
 	ANIM_animdata_filter(ac, &anim_data, filter, ac->data, ac->datatype);
 
+	/* Run the algorithm. Note that the boolean passed as the argument informs the exec function as to whether the 
+	 * fcurves are using beztriples or fsamples. If neither beztripes or fsamples are found, the operator is canceled.
+	 *
+	 * ??? Currently only the first fcurve is used to make this decision. Should I somehow warn the user that all active
+	 * fcurves must contain either only beztriples or only fsamples?
+	 */
+
 	ale = anim_data.first;
 	fcu = ale->key_data;
 
-	if (fcu && fcu->bezt) {
+	if (fcu && fcu->bezt)
 		reduce_keyframes(&anim_data, n_keys, true);
-	} else if (fcu && fcu->fpt) {
+	else if (fcu && fcu->fpt)
 		reduce_keyframes(&anim_data, n_keys, false);
-	} else {
+	else
 		return 0;
-	}
 
 	ANIM_animdata_update(ac, &anim_data);
 	ANIM_animdata_freelist(&anim_data);
@@ -1114,17 +1122,16 @@ static int reduce_keyframes_exec(bContext *C, wmOperator *op)
 		return OPERATOR_CANCELLED;
 		
 	/* get reduce key count */
-	n_keys = RNA_int_get(op->ptr, "NKeys");
+	n_keys = RNA_int_get(op->ptr, "n_keys");
 	
 	/* reduce keyframes */
 	success = reduce_keyframes_wrapper(&ac, n_keys);
 	
-	if (success) {
-		WM_event_add_notifier(C, NC_ANIMATION | ND_KEYFRAME | NA_EDITED, NULL);
-		return OPERATOR_FINISHED;
-	} else {
+	if (!success)
 		return OPERATOR_CANCELLED;
-	}
+
+	WM_event_add_notifier(C, NC_ANIMATION | ND_KEYFRAME | NA_EDITED, NULL);
+	return OPERATOR_FINISHED;
 }
 
 static int reduce_keyframes_invoke_wrapper(bContext *C, wmOperator *op, const wmEvent *event)
@@ -1158,7 +1165,7 @@ void GRAPH_OT_reduce(wmOperatorType *ot)
 	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 	
 	/* properties */
-	ot->prop = RNA_def_int(ot->srna, "NKeys", 8, 3, 100, "Number of keyframes to reduce to", "", 3, 100);
+	ot->prop = RNA_def_int(ot->srna, "n_keys", 8, 3, 100, "Number of keyframes to reduce to", "", 3, 100);
 }
 
 /* ******************** Bake F-Curve Operator *********************** */

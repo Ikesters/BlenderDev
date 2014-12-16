@@ -45,10 +45,10 @@ int    ED_reduction_get_number_of_frames  (ListBase *anim_data);
 
 /* Pose Array Construction ------------------------------------------------------------------------------------------ */
 /* 
- * Instead of running a cost function on n one-dimensional f-curves, we choose to use 1 n-dimensional curve. The
+ * Instead of running a cost function on n one-dimensional fcurves, we choose to use 1 n-dimensional curve. The
  * following functions create, fill, and delete this data structure. This n-dimensional curve can be imagined as an
- * array of poses, where a pose is defined as the current value for each degree of freedeom (the value for each 
- * motion curve).
+ * array of poses, where the component of that array at index i contains the pose for frame i. The pose itself is an 
+ * of the value of each fcurve at frame i.
  */
 
 typedef float **NPoseArr;
@@ -62,9 +62,9 @@ void ED_reduction_free_pose_arr               (NPoseArr *n_pose_arr, int n_frame
 /* Cost Analysis ---------------------------------------------------------------------------------------------------- */
 /* 
  * The following functions are used when evaluating how successful a proposed reduction is. A proposed reduction is
- * composed of segments, where each segments is defined by a start frame, a finish frame, and a path. The cost of the
- * segment is taken to be the maximum perpendicular distance between the original f-curve and the multi-point path
- * (each pair of points in the path is referred to as a "chord").
+ * composed of segments, where each segments is defined by a start frame, a finish frame, and a set of points. The cost
+ * of the segment is taken to be the maximum perpendicular distance between the original f-curve and the closest chord
+ * (a "chord" is the line between a neighboring pair of points).
  */
 
 float ED_reduction_line_to_point_dist (float *p, float *q1, float *q2, const int npts);
@@ -73,27 +73,27 @@ float ED_reduction_segment_cost       (NPoseArr *n_pose_arr, int start_f, int en
 
 /* Reduction Algorithm ---------------------------------------------------------------------------------------------- */
 /* 
- * A dynamic programming algorithm is used to try all possible placements of the desired number of keyframes. An 
- * n-dimensional curve is given, which is "learned" by the algorithm. This learning establishes two 
- * stoptables. The best placement of the keyframes can be read directly from the finished tables.
+ * A dynamic programming algorithm is used to try all possible placements of the desired number of keyframes. A
+ * pose array is given, which is "learned" by the algorithm. This learning establishes two stoptables. The best 
+ * placement of the keyframes can be read directly from the finished tables.
  *
- * A stoptable is the name we have given to the dynamic programming tables used by this algoirthm. Each cell of a 
- * stoptable represents the best path between two points, where the starting point is denoted by the row number, and the 
- * finishing point the column number. Here the word "point" is used to denote a component of the n-dimensional curve (an 
- * n-dimensional point). A "stop" is a point that is placed between the start and finish points. The end goal of the 
- * algorithm is to find the best n-2 stops between the start and finish frames of the motion curve (-2 because the start
- * and finish points are already given).
+ * A stoptable is the name we have given to the dynamic programming tables used by this algorithm. Each cell of a 
+ * stoptable represents the most significant "stops" between two boundary "points", denoted by the row and column number
+ * of the cell, respectively. Here the word point is used to denote a pose within the given pose array (see the pose 
+ * array construction section), and a stop is a point that is placed between the boundary points. The end goal of the 
+ * algorithm is to find the best n stops between the boundary points on the original motion curve.
  *
- * The first table the algorithm computes is called the zero-stoptable (z_table). Here the zero indicates that each
- * cell will feature the best zero stop path between the two points. The other table created is called the n-table,
+ * The first table the algorithm computes is called the zero-stop table (z_table). Here the term zero indicates that
+ * each cell will feature the best zero stop path between the two points. The other table created is called the n-table,
  * where "n" suggests that each cell features the best n stop path between the two points. The n-table is created by 
- * duplicated the z-table first, and then is recursively updated. Note that the first time it is updated, the n-table
- * will describe the best 1-stop path between each pair of points, or the best three keyframes that start and finish on
- * that pair of points. The second update will describe the best 2-stop path (2 keyframes between), third update 
- * 3-stop path (3 between), and so on.
+ * duplicating the z-table first, and then is recursively updated where one stop is added during each update. Note that
+ * the first time it is updated, the n-table will describe the best 1-stop path between each pair of points, or the best
+ * most significant keyframe within the boundaries. After the second update the n-table will describe the best 2-stop 
+ * path (2 keyframes between boundaries), the 3-stop path after the third update, and so on.
  *
- * The algorithm finishes when n-2 updates have been completed, at which time the best placements of n keyframes can be 
- * read straight from the n-table.
+ * The algorithm finishes when enough updates have been completed for the n-table to describe the most significant n-2
+ * keyframes, where n is denoted by the n_keys variables which is provided by the operator. Note the -2 is because the 
+ * first and last keyframes and given by the boundary points.
  */
 
 typedef struct NStop {
@@ -103,13 +103,13 @@ typedef struct NStop {
 } NStop;
 typedef NStop *StopTable;
 
-void ED_reduction_init_stoptable              (StopTable *table, int n_frames, int n_keys);
-void ED_reduction_copy_stoptable              (StopTable a, StopTable b, int n_frames);
-void ED_reduction_delete_stoptable            (StopTable *table, int n_frames);
-void ED_reduction_zero_stoptable              (StopTable table, NPoseArr *n_pose_arr, int n_frames, int n_curves);
-void ED_reduction_n_stoptable                 (int *indices, int n_frames, int n_keys, int n, StopTable n_table,
-																							  StopTable n_tableBuffer,
-																							  StopTable z_table);
+void ED_reduction_init_stoptable   (StopTable *table, int n_frames, int n_keys);
+void ED_reduction_copy_stoptable   (StopTable a, StopTable b, int n_frames);
+void ED_reduction_delete_stoptable (StopTable *table, int n_frames);
+void ED_reduction_zero_stoptable   (StopTable table, NPoseArr *n_pose_arr, int n_frames, int n_curves);
+void ED_reduction_n_stoptable      (int *indices, int n_frames, int n_keys, int n, StopTable n_table,
+																				   StopTable n_tableBuffer,
+																				   StopTable z_table);
 
 
 /* Keyframe Data Caching -------------------------------------------------------------------------------------------- */
@@ -135,13 +135,14 @@ void ED_reduction_delete_frame_cache                 (FrameCache *cache);
 
 /* Bezier Handle Tweaking ------------------------------------------------------------------------------------------- */
 /*
- * This algorithm tries a set of different bezier-handle placements for the new keyframes. If a placement that matches
- * the original curve more closely is found, it is kept.
+ * This iterative algorithm tries a set of different bezier-handle placements for the new keyframes. If a placement 
+ * that matches the original curve more closely is found, it is kept.
  *
- * This algorithms works by first posing the f-curve as a set of segments, where a segment is defined as any part of the
- * curve that lies between two key-frames. Forty tweaks are tested for right-most anchor of the keyframe to the left, 
- * and another forty for the left-most anchor of the keyframe to the right. These first tweaks will test the
- * handle at half the width of the section below the keyframe, and the last half the width above.
+ * This algorithm works by first posing the fcurve as a set of segments, where a segment is defined as any part of the 
+ * curve that lies between two key-frames. For each segment, a number of different lengths for the inner bezier handles 
+ * (right handle of keyframe to the left, and left handle of keyframe to the right). These lengths range from half the
+ * width of the section below the keyframe, to half the width above. The number of tweaks is given by the
+ * NUMBER_OF_TWEAKS variable.
  */
 
 typedef struct Anchor {
@@ -160,9 +161,13 @@ Anchor ED_reduction_pick_anchor_for_segment(Frame *org_frames, float start_f, fl
  * is still under-development, but should working relatively as intended. Please contact Riro (Richard Roberts) for any
  * questions, issues, or feedback - rykardo.r@gmail.com - thanks!
  *
- * These functions are called directly by the operator. The first function runs the reduction algorithm to find the best
- * n keyframes that represented the given animation. The second function first reduces the keyframes of each motion
- * curve to those indicated by the given indices, and then runs the bezier handle tweaking algorithm.
+ * These following functions are called directly by the operator. The first function runs the reduction algorithm to 
+ * find the best n keyframes that represent the given animation, the second function reduces the keyframes of an fcurve
+ * to those indicated by the given indices, and then third runs a bezier handle tweaking algorithm to manipulate an
+ * fcurve in order to match the original data as closely as possible. 
+ *
+ * This module is broken into different sections, please refer to them for more information, or email me if those
+ * comments are not sufficient - eventually I will document the code properly!
  */
 
 void ED_reduction_pick_best_frames        (NPoseArr n_pose_arr, int n_keys, int n_frames, int n_curves, int *indices);
