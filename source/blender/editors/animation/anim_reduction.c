@@ -453,20 +453,23 @@ float ED_reduction_interpolation_cost(Frame *org_frames, float start_f, float en
 
 Anchor ED_reduction_pick_anchor_for_segment(Frame *org_frames, float start_f, float end_f)
 {
+	Anchor tmp, output;
 	float half_segment_length, inc;
 	float i, j, bestI, bestJ;
 	float cost_min, cost;
 
 	half_segment_length = (end_f - start_f) / 2.0f;
 	inc = half_segment_length / (NUMBER_OF_TWEAKS * 0.5f);
-	cost_min = 99999.0;
-	bestI = 0.0;
-	bestJ = 0.0;
+	cost_min = 99999.0f;
+	bestI = 0.0f;
+	bestJ = 0.0f;
 
 	for (i = -half_segment_length; i < half_segment_length; i += inc) {
 		for (j = -half_segment_length; j < half_segment_length; j += inc) {
 
-			cost = ED_reduction_interpolation_cost(org_frames, start_f, end_f, (Anchor) { i, j });
+			tmp.p1 = i;
+			tmp.p2 = j;
+			cost = ED_reduction_interpolation_cost(org_frames, start_f, end_f, tmp);
 			if (cost < cost_min) {
 				cost_min = cost;
 				bestI = i;
@@ -475,7 +478,9 @@ Anchor ED_reduction_pick_anchor_for_segment(Frame *org_frames, float start_f, fl
 		}
 	}
 
-	return (Anchor) { bestI, bestJ };
+	output.p1 = bestI;
+	output.p2 = bestJ;
+	return output;
 }
 
 
