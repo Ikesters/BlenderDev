@@ -187,11 +187,10 @@ float ED_reduction_line_to_point_dist(float *p, float *q1, float *q2, const int 
 
 	numer = dot_vn_vn(q_p1, q2_q1, npts);
 	denom = dot_vn_vn(q2_q1, q2_q1, npts);
-	if (denom != 0) {
+	if (denom != 0)
 		t = numer / denom;
-	} else {
+	else
 		t = numer;
-	}
 
 	mul_vn_fl(q2_q1, npts, t);
 	sub_vn_vnvn(p_q1q2, q_p1, q2_q1, npts);
