@@ -391,7 +391,6 @@ void ED_reduction_cache_indices_of_fcurve_fpoints(Frame *cache, FCurve *fcu, int
 			tmpFrame.f = fpt->vec[0];
 			tmpFrame.v = fpt->vec[1];
 			cache[index] = tmpFrame;
-
 			index ++;
 		}
 	}
@@ -446,7 +445,6 @@ float ED_reduction_interpolation_cost(Frame *org_frames, float start_f, float en
 		cost = fabs(original_v - interped_v);
 		if (cost > cost_max)
 			cost_max = cost;
-
 		index ++;
 	}
 
@@ -459,8 +457,8 @@ Anchor ED_reduction_pick_anchor_for_segment(Frame *org_frames, float start_f, fl
 	float i, j, bestI, bestJ;
 	float cost_min, cost;
 
-	half_segment_length = (end_f - start_f) / 2.0;
-	inc = half_segment_length / (NUMBER_OF_TWEAKS * 0.5);
+	half_segment_length = (end_f - start_f) / 2.0f;
+	inc = half_segment_length / (NUMBER_OF_TWEAKS * 0.5f);
 	cost_min = 99999.0;
 	bestI = 0.0;
 	bestJ = 0.0;
