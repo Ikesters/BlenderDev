@@ -112,18 +112,18 @@ int ED_reduction_get_number_of_frames(ListBase *anim_data)
  * of the value of each fcurve at frame i.
  */
 
-void ED_reduction_init_pose_arr(NPoseArr *n_pose_arr, int n_frames, int n_curves)
+void ED_reduction_init_pose_arr(NPoseArray *n_pose_array, int n_frames, int n_curves)
 {
 	int i;
 
-	(*n_pose_arr) = MEM_mallocN(sizeof(float *) * n_frames, "NPoseArr_new");
+	(*n_pose_array) = MEM_mallocN(sizeof(float *) * n_frames, "NPoseArray_new");
 	for (i = 0; i < n_frames; i++)
-		(*n_pose_arr)[i] = MEM_mallocN(sizeof(float) * n_curves, "NPoseArr_row");
+		(*n_pose_array)[i] = MEM_mallocN(sizeof(float) * n_curves, "NPoseArray_row");
 }
 
 
 
-void ED_reduction_fill_pose_arr_beziertriples(NPoseArr *n_pose_arr, ListBase *anim_data, int n_frames)
+void ED_reduction_fill_pose_arr_beziertriples(NPoseArray *n_pose_array, ListBase *anim_data, int n_frames)
 { 
 	bAnimListElem *ale;
 	FCurve *fcu;
@@ -131,17 +131,17 @@ void ED_reduction_fill_pose_arr_beziertriples(NPoseArr *n_pose_arr, ListBase *an
 	int i, j;
 	
 	for (j = 0; j < n_frames; j++)
-		(*n_pose_arr)[j][0] = j;
+		(*n_pose_array)[j][0] = j;
 
 	for (i = 0, ale = anim_data->first; ale; i++, ale = ale->next) {
 		fcu = ale->key_data;
 
 		for (j = 0, bezt = fcu->bezt; j < fcu->totvert; j++, bezt++)
-			(*n_pose_arr)[j][i + 1] = bezt->vec[1][1];
+			(*n_pose_array)[j][i + 1] = bezt->vec[1][1];
 	}
 }
 
-void ED_reduction_fill_pose_arr_fpoints(NPoseArr *n_pose_arr, ListBase *anim_data, int n_frames)
+void ED_reduction_fill_pose_arr_fpoints(NPoseArray *n_pose_array, ListBase *anim_data, int n_frames)
 {
 	bAnimListElem *ale;
 	FCurve *fcu;
@@ -149,23 +149,23 @@ void ED_reduction_fill_pose_arr_fpoints(NPoseArr *n_pose_arr, ListBase *anim_dat
 	int i, j;
 
 	for (j = 0; j < n_frames; j++)
-		(*n_pose_arr)[j][0] = j;
+		(*n_pose_array)[j][0] = j;
 
 	for (i = 0, ale = anim_data->first; ale; i++, ale = ale->next) {
 		fcu = ale->key_data;
 
 		for (j = 0, fpt = fcu->fpt; j < fcu->totvert; j++, fpt++)
-			(*n_pose_arr)[j][i + 1] = fpt->vec[1];
+			(*n_pose_array)[j][i + 1] = fpt->vec[1];
 	}
 }
 
-void ED_reduction_free_pose_arr(NPoseArr *n_pose_arr, int n_frames)
+void ED_reduction_free_pose_arr(NPoseArray *n_pose_array, int n_frames)
 {
 	int i;
 
 	for (i = 0; i < n_frames; i++)
-		MEM_freeN((*n_pose_arr)[i]);
-	MEM_freeN((*n_pose_arr));
+		MEM_freeN((*n_pose_array)[i]);
+	MEM_freeN((*n_pose_array));
 }
 
 
@@ -198,14 +198,15 @@ float ED_reduction_line_to_point_dist(float *p, float *q1, float *q2, const int 
 	return sqrt(len_squared_vn(p_q1q2, npts));
 }
 
-float ED_reduction_segment_cost(NPoseArr *n_pose_arr, int start_f, int end_f, int n_curves)
+float ED_reduction_segment_cost(NPoseArray *n_pose_array, int start_f, int end_f, int n_curves)
 {
 	float max_dist, dist;
 	int i;
 
 	max_dist = 0;
 	for (i = start_f; i < end_f; i++) {
-		dist = ED_reduction_line_to_point_dist((*n_pose_arr)[i], (*n_pose_arr)[start_f], (*n_pose_arr)[end_f], n_curves);
+		dist = ED_reduction_line_to_point_dist((*n_pose_array)[i], (*n_pose_array)[start_f], (*n_pose_array)[end_f],
+											   n_curves);
 		
 		if (dist > max_dist)
 			max_dist = dist;
@@ -270,7 +271,7 @@ void ED_reduction_delete_stoptable(StopTable *table, int n_frames)
 	MEM_freeN(*table);
 }
 
-void ED_reduction_zero_stoptable(StopTable table, NPoseArr *n_pose_arr, int n_frames, int n_curves)
+void ED_reduction_zero_stoptable(StopTable table, NPoseArray *n_pose_array, int n_frames, int n_curves)
 {
 	int i, j, index;
 	float cost;
@@ -278,7 +279,7 @@ void ED_reduction_zero_stoptable(StopTable table, NPoseArr *n_pose_arr, int n_fr
 	for (i = 0; i < n_frames - 1; i++) {
 		for (j = i + 1; j < n_frames; j++) {
 			index = i * n_frames + j;
-			cost = ED_reduction_segment_cost(n_pose_arr, i, j, n_curves);
+			cost = ED_reduction_segment_cost(n_pose_array, i, j, n_curves);
 			table[index].cost = cost;
 			table[index].n = 2;
 			table[index].path[0] = i;
@@ -499,7 +500,7 @@ Anchor ED_reduction_pick_anchor_for_segment(Frame *org_frames, float start_f, fl
  * comments are not sufficient - eventually I will document the code properly!
  */
  
-void ED_reduction_pick_best_frames(NPoseArr n_pose_arr, int n_keys, int n_frames, int n_curves, int *indices)
+void ED_reduction_pick_best_frames(NPoseArray n_pose_array, int n_keys, int n_frames, int n_curves, int *indices)
 {	
 	StopTable z_table = NULL;
 	StopTable n_table = NULL;
@@ -509,7 +510,7 @@ void ED_reduction_pick_best_frames(NPoseArr n_pose_arr, int n_keys, int n_frames
 	ED_reduction_init_stoptable(&z_table, n_frames, n_keys);
 	ED_reduction_init_stoptable(&n_table, n_frames, n_keys);
 	ED_reduction_init_stoptable(&n_tableBuffer, n_frames, n_keys);
-	ED_reduction_zero_stoptable(z_table, &n_pose_arr, n_frames, n_curves);
+	ED_reduction_zero_stoptable(z_table, &n_pose_array, n_frames, n_curves);
 	ED_reduction_copy_stoptable(z_table, n_table, n_frames);
 
 	/* Recursively find the best point-path the first and last frame. */
@@ -519,7 +520,7 @@ void ED_reduction_pick_best_frames(NPoseArr n_pose_arr, int n_keys, int n_frames
 	ED_reduction_delete_stoptable(&z_table, n_frames);
 	ED_reduction_delete_stoptable(&n_table, n_frames);
 	ED_reduction_delete_stoptable(&n_tableBuffer, n_frames);
-	ED_reduction_free_pose_arr(&n_pose_arr, n_frames);
+	ED_reduction_free_pose_arr(&n_pose_array, n_frames);
 }
 
 void ED_reduction_reduce_fcurve_to_frames(FCurve *fcu, Frame *reduced_frames, int n_keys)
@@ -539,19 +540,21 @@ void ED_reduction_reduce_fcurve_to_frames(FCurve *fcu, Frame *reduced_frames, in
 
 void ED_reduction_tweak_fcurve_anchors(FCurve *fcu, Frame *org_frames, Frame *reduced_frames)
 {
-	int i;
-	float start_f, end_f;
 	BezTriple *bezLeft;
 	BezTriple *bezRight;
+	Anchor anchor;
+	int i;
+	float start_f, end_f;
 
 	for (i = 1; i < fcu->totvert; i++) {
 		start_f = reduced_frames[i - 1].f;
 		end_f = reduced_frames[i].f;
-		Anchor anchor = ED_reduction_pick_anchor_for_segment(org_frames, start_f, end_f);
+		anchor = ED_reduction_pick_anchor_for_segment(org_frames, start_f, end_f);
 		
 		bezLeft  = (fcu->bezt + i - 1);
+		bezLeft->vec[2][1] = anchor.p1;
+
 		bezRight = (fcu->bezt + i);
-		bezRight->vec[0][1] = anchor.p1;
-		bezLeft->vec[2][1] = anchor.p2;
+		bezRight->vec[0][1] = anchor.p2;
 	}
 }

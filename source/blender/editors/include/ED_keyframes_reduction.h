@@ -50,12 +50,12 @@ int    ED_reduction_get_number_of_frames  (ListBase *anim_data);
  * of the value of each fcurve at frame i.
  */
 
-typedef float **NPoseArr;
+typedef float **NPoseArray;
 
-void ED_reduction_init_pose_arr               (NPoseArr *n_pose_arr, int n_frames, int n_curves);
-void ED_reduction_fill_pose_arr_beziertriples (NPoseArr *n_pose_arr, ListBase *anim_data, int n_frames);
-void ED_reduction_fill_pose_arr_fpoints       (NPoseArr *n_pose_arr, ListBase *anim_data, int n_frames);
-void ED_reduction_free_pose_arr               (NPoseArr *n_pose_arr, int n_frames);
+void ED_reduction_init_pose_arr               (NPoseArray *n_pose_array, int n_frames, int n_curves);
+void ED_reduction_fill_pose_arr_beziertriples (NPoseArray *n_pose_array, ListBase *anim_data, int n_frames);
+void ED_reduction_fill_pose_arr_fpoints       (NPoseArray *n_pose_array, ListBase *anim_data, int n_frames);
+void ED_reduction_free_pose_arr               (NPoseArray *n_pose_array, int n_frames);
 
 
 /* Cost Analysis ---------------------------------------------------------------------------------------------------- */
@@ -67,7 +67,7 @@ void ED_reduction_free_pose_arr               (NPoseArr *n_pose_arr, int n_frame
  */
 
 float ED_reduction_line_to_point_dist (float *p, float *q1, float *q2, const int npts);
-float ED_reduction_segment_cost       (NPoseArr *n_pose_arr, int start_f, int end_f, int n_curves);
+float ED_reduction_segment_cost       (NPoseArray *n_pose_array, int start_f, int end_f, int n_curves);
 
 
 /* Reduction Algorithm ---------------------------------------------------------------------------------------------- */
@@ -105,7 +105,7 @@ typedef NStop *StopTable;
 void ED_reduction_init_stoptable   (StopTable *table, int n_frames, int n_keys);
 void ED_reduction_copy_stoptable   (StopTable a, StopTable b, int n_frames);
 void ED_reduction_delete_stoptable (StopTable *table, int n_frames);
-void ED_reduction_zero_stoptable   (StopTable table, NPoseArr *n_pose_arr, int n_frames, int n_curves);
+void ED_reduction_zero_stoptable   (StopTable table, NPoseArray *n_pose_array, int n_frames, int n_curves);
 void ED_reduction_n_stoptable      (int *indices, int n_frames, int n_keys, int n, StopTable n_table,
 																				   StopTable n_tableBuffer,
 																				   StopTable z_table);
@@ -167,7 +167,8 @@ Anchor ED_reduction_pick_anchor_for_segment(Frame *org_frames, float start_f, fl
  * comments are not sufficient - eventually I will document the code properly!
  */
 
-void ED_reduction_pick_best_frames        (NPoseArr n_pose_arr, int n_keys, int n_frames, int n_curves, int *indices);
+void ED_reduction_pick_best_frames        (NPoseArray n_pose_array, int n_keys, int n_frames, int n_curves,
+										   int *indices);
 void ED_reduction_reduce_fcurve_to_frames (FCurve *fcu, Frame *reduced_frames, int n_keys);
 void ED_reduction_tweak_fcurve_anchors    (FCurve *fcu, Frame *org_frames, Frame *reduced_frames);
 

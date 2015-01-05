@@ -1027,7 +1027,7 @@ static void reduce_keyframes(ListBase *anim_data, int n_keys, bool usingBezTripl
 	bAnimListElem *ale;
 	FCurve * fcu;
 	int n_frames, n_curves;
-	NPoseArr n_pose_arr;
+	NPoseArray n_pose_array;
 	int *indices;
 	Frame *org_frames;
 	Frame *reduced_frames;
@@ -1035,16 +1035,16 @@ static void reduce_keyframes(ListBase *anim_data, int n_keys, bool usingBezTripl
 	/* Cache data into a pose array, refer to the pose array construction section in ED_keyframe_reduction */
 	n_frames = ED_reduction_get_number_of_frames(anim_data);
 	n_curves = BLI_countlist(anim_data) + 1;
-	ED_reduction_init_pose_arr(&n_pose_arr, n_frames, n_curves);
+	ED_reduction_init_pose_arr(&n_pose_array, n_frames, n_curves);
 
 	if (usingBezTriples)
-		ED_reduction_fill_pose_arr_beziertriples(&n_pose_arr, anim_data, n_frames);
+		ED_reduction_fill_pose_arr_beziertriples(&n_pose_array, anim_data, n_frames);
 	else
-		ED_reduction_fill_pose_arr_fpoints(&n_pose_arr, anim_data, n_frames);
+		ED_reduction_fill_pose_arr_fpoints(&n_pose_array, anim_data, n_frames);
 
 	/* Pick the best placement of keyframes */
 	indices = MEM_mallocN(sizeof(int) * n_keys, "indices");
-	ED_reduction_pick_best_frames(n_pose_arr, n_keys, n_frames, n_curves, indices);
+	ED_reduction_pick_best_frames(n_pose_array, n_keys, n_frames, n_curves, indices);
 
 
 	/* For each fcurve, delete all data and then reconstruct based on the given caches */
@@ -1084,7 +1084,8 @@ static int reduce_keyframes_wrapper(bAnimContext *ac, int n_keys) {
 	int filter;
 
 	/* filter data */
-	filter = (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_CURVE_VISIBLE | ANIMFILTER_FOREDIT | ANIMFILTER_NODUPLIS | ANIMFILTER_SEL);
+	filter = (ANIMFILTER_DATA_VISIBLE | ANIMFILTER_CURVE_VISIBLE | ANIMFILTER_FOREDIT | ANIMFILTER_NODUPLIS |
+			  ANIMFILTER_SEL);
 	ANIM_animdata_filter(ac, &anim_data, filter, ac->data, ac->datatype);
 
 	/* Run the algorithm. Note that the boolean passed as the argument informs the exec function as to whether the 
