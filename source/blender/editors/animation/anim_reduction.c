@@ -98,12 +98,9 @@ int ED_reduction_get_number_of_frames(ListBase *anim_data)
 	bAnimListElem *ale;
 	FCurve * fcu;
 
-	for (ale = anim_data->first; ale; ale = ale->next) {
-		fcu = ale->key_data;
-		return fcu->totvert;
-	}
-
-	return -1;
+	ale = anim_data->first;
+	fcu = ale->key_data;
+	return fcu->totvert;
 }
 
 
