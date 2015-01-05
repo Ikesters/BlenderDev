@@ -82,12 +82,6 @@ void ED_reduction_copy_indicies(int *tgt, int *src, int npts)
 	memcpy(tgt, src, sizeof(int) * npts);
 }
 
-void ED_reduction_copy_indicies_and_add(int *tgt, int *src, int npts, int v)
-{
-	ED_reduction_copy_indicies(tgt, src, npts);
-	tgt[npts] = v;
-}
-
 bool ED_reduction_val_in_array(int val, int *arr, int size)
 {
 	int i;
@@ -324,7 +318,8 @@ void ED_reduction_n_stoptable(int *indices, int n_frames, int n_keys, int n, Sto
 					cost_min = cost;	
 					n_tableBuffer[ij].cost = cost;
 					n_tableBuffer[ij].n = n_table[ik].n + 1;
-					ED_reduction_copy_indicies_and_add(n_tableBuffer[ij].path, n_table[ik].path, n_table[ik].n, j);
+					ED_reduction_copy_indicies(n_tableBuffer[ij].path, n_table[ik].path, n_table[ik].n);
+					n_tableBuffer[ij].path[n_table[ik].n] = j;
 				}
 			}
 		}

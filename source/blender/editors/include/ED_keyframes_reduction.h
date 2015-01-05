@@ -38,7 +38,6 @@
  */
 
 void   ED_reduction_copy_indicies         (int *tgt, int *src, int npts);
-void   ED_reduction_copy_indicies_and_add (int *tgt, int *src, int npts, int v);
 bool   ED_reduction_val_in_array          (int val, int *arr, int size);
 int    ED_reduction_get_number_of_frames  (ListBase *anim_data);
 
