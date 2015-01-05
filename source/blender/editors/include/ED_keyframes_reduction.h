@@ -122,14 +122,12 @@ typedef struct Frame {
 	float v;
 } Frame;
 
-typedef Frame *FrameCache;
-
-void ED_reduction_init_frame_cache                   (FrameCache *cache, int n);
-void ED_reduction_cache_fcurve_beztriples            (FrameCache cache, FCurve * fcu);
-void ED_reduction_cache_indices_of_fcurve_beztriples (FrameCache cache, FCurve * fcu, int *indices, int n_keys);
-void ED_reduction_cache_fcurve_fpoints               (FrameCache cache, FCurve * fcu);
-void ED_reduction_cache_indices_of_fcurve_fpoints    (FrameCache cache, FCurve * fcu, int *indices, int n_keys);
-void ED_reduction_delete_frame_cache                 (FrameCache *cache);
+Frame *ED_reduction_init_frame_cache                   (int n);
+void   ED_reduction_cache_fcurve_beztriples            (Frame *cache, FCurve *fcu);
+void   ED_reduction_cache_fcurve_fpoints               (Frame *cache, FCurve *fcu);
+void   ED_reduction_cache_indices_of_fcurve_beztriples (Frame *cache, FCurve *fcu, int *indices, int n_keys);
+void   ED_reduction_cache_indices_of_fcurve_fpoints    (Frame *cache, FCurve *fcu, int *indices, int n_keys);
+void   ED_reduction_delete_frame_cache                 (Frame *cache);
 
 
 /* Bezier Handle Tweaking ------------------------------------------------------------------------------------------- */
@@ -170,8 +168,8 @@ Anchor ED_reduction_pick_anchor_for_segment(Frame *org_frames, float start_f, fl
  */
 
 void ED_reduction_pick_best_frames        (NPoseArr n_pose_arr, int n_keys, int n_frames, int n_curves, int *indices);
-void ED_reduction_reduce_fcurve_to_frames (FCurve * fcu, FrameCache reduced_frames, int n_keys);
-void ED_reduction_tweak_fcurve_anchors    (FCurve * fcu, Frame *org_frames, Frame *reduced_frames);
+void ED_reduction_reduce_fcurve_to_frames (FCurve *fcu, Frame *reduced_frames, int n_keys);
+void ED_reduction_tweak_fcurve_anchors    (FCurve *fcu, Frame *org_frames, Frame *reduced_frames);
 
 
 /* Registration ----------------------------------------------------------------------------------------------------- */

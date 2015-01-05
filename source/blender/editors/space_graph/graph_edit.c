@@ -1052,8 +1052,8 @@ static void reduce_keyframes(ListBase *anim_data, int n_keys, bool usingBezTripl
 		fcu = ale->key_data;
 
 		/* Cache keyframe data for this fcurve */
-		ED_reduction_init_frame_cache(&org_frames, n_frames);
-		ED_reduction_init_frame_cache(&reduced_frames, n_keys);
+		org_frames = ED_reduction_init_frame_cache(n_frames);
+		reduced_frames = ED_reduction_init_frame_cache(n_keys);
 
 		if (usingBezTriples) {
 			ED_reduction_cache_fcurve_beztriples(org_frames, fcu);
@@ -1068,8 +1068,8 @@ static void reduce_keyframes(ListBase *anim_data, int n_keys, bool usingBezTripl
 		ED_reduction_tweak_fcurve_anchors(fcu, org_frames, reduced_frames);
 		
 		/* Clean up */
-		ED_reduction_delete_frame_cache(&org_frames);
-		ED_reduction_delete_frame_cache(&reduced_frames);
+		ED_reduction_delete_frame_cache(org_frames);
+		ED_reduction_delete_frame_cache(reduced_frames);
 		ale->update |= ANIM_UPDATE_DEFAULT;
 	}
 

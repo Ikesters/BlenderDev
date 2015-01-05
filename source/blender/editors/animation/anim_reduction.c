@@ -96,7 +96,7 @@ bool ED_reduction_val_in_array(int val, int *arr, int size)
 int ED_reduction_get_number_of_frames(ListBase *anim_data)
 {
 	bAnimListElem *ale;
-	FCurve * fcu;
+	FCurve *fcu;
 
 	ale = anim_data->first;
 	fcu = ale->key_data;
@@ -330,12 +330,12 @@ void ED_reduction_n_stoptable(int *indices, int n_frames, int n_keys, int n, Sto
  * of an fcurve after it has been deleted.
  */
 
-void ED_reduction_init_frame_cache(FrameCache *cache, int n)
+Frame *ED_reduction_init_frame_cache(int n)
 {
-	*cache = MEM_mallocN(sizeof(Frame) * n, "FrameCache_new");
+	return MEM_mallocN(sizeof(Frame) * n, "FrameCache_new");
 }
 
-void ED_reduction_cache_fcurve_beztriples(FrameCache cache, FCurve * fcu)
+void ED_reduction_cache_fcurve_beztriples(Frame *cache, FCurve *fcu)
 {
 	Frame tmpFrame;
 	BezTriple *bezt;
@@ -348,7 +348,20 @@ void ED_reduction_cache_fcurve_beztriples(FrameCache cache, FCurve * fcu)
 	}
 }
 
-void ED_reduction_cache_indices_of_fcurve_beztriples(FrameCache cache, FCurve * fcu, int *indices, int n_keys)
+void ED_reduction_cache_fcurve_fpoints(Frame *cache, FCurve *fcu)
+{
+	Frame tmpFrame;
+	FPoint *fpt;
+	int i;
+
+	for (i = 0, fpt = fcu->fpt; i < fcu->totvert; i++, fpt++) {
+		tmpFrame.f = fpt->vec[0];
+		tmpFrame.v = fpt->vec[1];
+		cache[i] = tmpFrame;
+	}
+}
+
+void ED_reduction_cache_indices_of_fcurve_beztriples(Frame *cache, FCurve *fcu, int *indices, int n_keys)
 {
 	Frame tmpFrame;
 	BezTriple *bezt;
@@ -366,20 +379,7 @@ void ED_reduction_cache_indices_of_fcurve_beztriples(FrameCache cache, FCurve * 
 	}
 }
 
-void ED_reduction_cache_fcurve_fpoints(FrameCache cache, FCurve * fcu)
-{
-	Frame tmpFrame;
-	FPoint *fpt;
-	int i;
-
-	for (i = 0, fpt = fcu->fpt; i < fcu->totvert; i++, fpt++) {
-		tmpFrame.f = fpt->vec[0];
-		tmpFrame.v = fpt->vec[1];
-		cache[i] = tmpFrame;
-	}
-}
-
-void ED_reduction_cache_indices_of_fcurve_fpoints(FrameCache cache, FCurve * fcu, int *indices, int n_keys)
+void ED_reduction_cache_indices_of_fcurve_fpoints(Frame *cache, FCurve *fcu, int *indices, int n_keys)
 {
 	Frame tmpFrame;
 	FPoint *fpt;
@@ -398,9 +398,9 @@ void ED_reduction_cache_indices_of_fcurve_fpoints(FrameCache cache, FCurve * fcu
 }
 
 
-void ED_reduction_delete_frame_cache(FrameCache *cache)
+void ED_reduction_delete_frame_cache(Frame *cache)
 {
-	MEM_freeN(*cache);	
+	MEM_freeN(cache);	
 }
 
 
@@ -519,7 +519,7 @@ void ED_reduction_pick_best_frames(NPoseArr n_pose_arr, int n_keys, int n_frames
 	ED_reduction_free_pose_arr(&n_pose_arr, n_frames);
 }
 
-void ED_reduction_reduce_fcurve_to_frames(FCurve * fcu, FrameCache reduced_frames, int n_keys)
+void ED_reduction_reduce_fcurve_to_frames(FCurve *fcu, Frame *reduced_frames, int n_keys)
 {
 	int i;
 
@@ -534,7 +534,7 @@ void ED_reduction_reduce_fcurve_to_frames(FCurve * fcu, FrameCache reduced_frame
 		insert_vert_fcurve(fcu, reduced_frames[i].f, reduced_frames[i].v, 1);
 }
 
-void ED_reduction_tweak_fcurve_anchors(FCurve * fcu, Frame *org_frames, Frame *reduced_frames)
+void ED_reduction_tweak_fcurve_anchors(FCurve *fcu, Frame *org_frames, Frame *reduced_frames)
 {
 	int i;
 	float start_f, end_f;
